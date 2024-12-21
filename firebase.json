@@ -1,0 +1,43 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "personal-finance-tracker-e8905",
+          "appId": "1:741105956958:android:2ddcc5ce267a87b5965ccf",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "personal-finance-tracker-e8905",
+          "configurations": {
+            "android": "1:741105956958:android:2ddcc5ce267a87b5965ccf",
+            "ios": "1:741105956958:ios:411d189978d63fd6965ccf",
+            "macos": "1:741105956958:ios:411d189978d63fd6965ccf",
+            "web": "1:741105956958:web:b2668bed039a5690965ccf",
+            "windows": "1:741105956958:web:d44b4a73e9a60c6e965ccf"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "database": {
+    "rules": "database.rules.json"
+  }
+}

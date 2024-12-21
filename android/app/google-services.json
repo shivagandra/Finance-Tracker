@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "741105956958",
+    "firebase_url": "https://personal-finance-tracker-e8905-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "personal-finance-tracker-e8905",
+    "storage_bucket": "personal-finance-tracker-e8905.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:741105956958:android:2ddcc5ce267a87b5965ccf",
+        "android_client_info": {
+          "package_name": "com.example.finance_tracking"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD6Id9rFncOEZPVwvZG7FQ1IKl3tlUB-64"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
