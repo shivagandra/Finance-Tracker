@@ -25,3 +25,10 @@ doc/api/
 
 .flutter-plugins
 .flutter-plugins-dependencies
+
+.idea/*
+node_modules/
+.vscode/*
+*.iml
+*.log
+package-lock.json

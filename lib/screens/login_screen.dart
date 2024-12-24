@@ -1,6 +1,7 @@
-import 'package:finance_tracker/screens/home_screen.dart';
 import 'package:finance_tracker/screens/registration_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:finance_tracker/screens/home_screen.dart';
+import 'package:finance_tracker/Controllers/Auth/auth_controller.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,10 +14,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-
-  void _submitForm() {
-    if (_formKey.currentState!.validate()) {}
-  }
+  final AuthController _authController = AuthController();
 
   @override
   void dispose() {
@@ -82,19 +80,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       filled: true,
                       fillColor: Colors.grey[200],
-                      contentPadding: EdgeInsets.symmetric(
+                      contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16.0,
                         vertical: 12.0,
-                      ),
-                      suffixIcon: GestureDetector(
-                        onTap: () {
-                          // Toggle password visibility (not implemented here)
-                          _passwordController.toString();
-                        },
-                        child: Icon(
-                          Icons.visibility_off,
-                          color: Colors.grey,
-                        ),
                       ),
                     ),
                     obscureText: true,
@@ -110,32 +98,42 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 32.0),
                   ElevatedButton(
-                    onPressed: () {
-                      _submitForm();
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => HomeScreen(),
-                        ),
-                      );
+                    onPressed: () async {
+                      if (_formKey.currentState!.validate()) {
+                        // Use the AuthController to handle login
+                        try {
+                          await _authController.signInWithEmailAndPassword(
+                            context: context,
+                            email: _emailController.text,
+                            password: _passwordController.text,
+                          );
+
+                          // Navigate to HomeScreen using MaterialPageRoute
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const HomeScreen(),
+                            ),
+                          );
+                        } catch (e) {
+                          debugPrint('Login error: $e');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Login failed: $e')),
+                          );
+                        }
+                      }
                     },
-                    style: ElevatedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      backgroundColor: Colors.blue,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10.0),
-                      ),
-                    ),
                     child: const Text('Login'),
                   ),
                   const SizedBox(height: 24.0),
                   TextButton(
                     onPressed: () {
-                      // Navigate to registration page
+                      // Navigate to Registration Screen using MaterialPageRoute
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => RegistrationPage()),
+                          builder: (context) => RegistrationPage(),
+                        ),
                       );
                     },
                     style: TextButton.styleFrom(

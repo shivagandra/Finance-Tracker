@@ -1,3 +1,7 @@
+import 'package:finance_tracker/screens/expenses_view_screen.dart';
+import 'package:finance_tracker/screens/profile_screen.dart';
+import 'package:finance_tracker/screens/search_screen.dart';
+import 'package:finance_tracker/utils/general_utilities.dart';
 import 'package:flutter/material.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -9,8 +13,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = [
-    HomePage(),
-    SearchPage(),
+    ExpenseViewScreen(),
+    SearchScreen(),
     ProfilePage(),
   ];
 
@@ -26,7 +30,24 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Bottom Navigation Bar")),
+      appBar: AppBar(
+        elevation: 2,
+        backgroundColor: hexToColor('#F9D1D3'),
+        title: Center(
+          child: Text(
+            "Finance Tracker",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 26,
+              color: hexToColor('#000000'),
+              fontWeight: FontWeight.bold,
+              fontStyle: FontStyle.italic,
+              fontFamily: 'Times New Roman',
+              textBaseline: TextBaseline.alphabetic,
+            ),
+          ),
+        ),
+      ),
       body: _screens[_selectedIndex], // Display the selected screen
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex, // Set the current selected tab
@@ -45,45 +66,6 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Profile',
           ),
         ],
-      ),
-    );
-  }
-}
-
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Text('Home Page'),
-      ),
-    );
-  }
-}
-
-class SearchPage extends StatelessWidget {
-  const SearchPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Text('Search Page'),
-      ),
-    );
-  }
-}
-
-class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Text('Profile Page'),
       ),
     );
   }
