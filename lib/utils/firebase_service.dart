@@ -23,6 +23,67 @@ class FirebaseService {
         email: email, password: password);
   }
 
+  // Future<UserCredential> register({
+  //   required String email,
+  //   required String password,
+  //   required String name,
+  //   String? profileImagePath,
+  // }) async {
+  //   try {
+  //     // 1. First create the user account
+  //     UserCredential credential = await _auth.createUserWithEmailAndPassword(
+  //       email: email,
+  //       password: password,
+  //     );
+
+  //     String? imageUrl;
+
+  //     // 2. If there's a profile image, upload it
+  //     if (profileImagePath != null) {
+  //       final String fileName =
+  //           'profile_${credential.user!.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+  //       final Reference storageRef =
+  //           _storage.ref().child('profile_images/$fileName');
+
+  //       UploadTask uploadTask;
+
+  //       if (kIsWeb) {
+  //         // For web platform
+  //         final XFile imageFile = XFile(profileImagePath);
+  //         final Uint8List imageBytes = await imageFile.readAsBytes();
+  //         uploadTask = storageRef.putData(
+  //           imageBytes,
+  //           SettableMetadata(contentType: 'image/jpeg'),
+  //         );
+  //       } else {
+  //         // For mobile platforms
+  //         final File imageFile = File(profileImagePath);
+  //         uploadTask = storageRef.putFile(imageFile);
+  //       }
+
+  //       // Wait for upload to complete and get URL
+  //       final TaskSnapshot taskSnapshot = await uploadTask;
+  //       imageUrl = await taskSnapshot.ref.getDownloadURL();
+  //     }
+
+  //     // 3. Create the user profile in Firestore
+  //     await _firestore.collection('users').doc(credential.user!.uid).set({
+  //       'name': name,
+  //       'email': email,
+  //       'profileImage': imageUrl,
+  //       'defaultCurrency': 'USD',
+  //       'createdAt': FieldValue.serverTimestamp(),
+  //     });
+
+  //     return credential;
+  //   } catch (e) {
+  //     if (kDebugMode) {
+  //       print('Error during registration: $e');
+  //     }
+  //     rethrow;
+  //   }
+  // }
+
   Future<UserCredential> register({
     required String email,
     required String password,
@@ -30,7 +91,7 @@ class FirebaseService {
     String? profileImagePath,
   }) async {
     try {
-      // 1. First create the user account
+      // 1. Create the user account
       UserCredential credential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -38,42 +99,46 @@ class FirebaseService {
 
       String? imageUrl;
 
-      // 2. If there's a profile image, upload it
+      // 2. Upload the profile image if provided
       if (profileImagePath != null) {
         final String fileName =
             'profile_${credential.user!.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final Reference storageRef =
             _storage.ref().child('profile_images/$fileName');
 
-        UploadTask uploadTask;
+        final UploadTask uploadTask = kIsWeb
+            ? storageRef.putData(await XFile(profileImagePath).readAsBytes(),
+                SettableMetadata(contentType: 'image/jpeg'))
+            : storageRef.putFile(File(profileImagePath));
 
-        if (kIsWeb) {
-          // For web platform
-          final XFile imageFile = XFile(profileImagePath);
-          final Uint8List imageBytes = await imageFile.readAsBytes();
-          uploadTask = storageRef.putData(
-            imageBytes,
-            SettableMetadata(contentType: 'image/jpeg'),
-          );
-        } else {
-          // For mobile platforms
-          final File imageFile = File(profileImagePath);
-          uploadTask = storageRef.putFile(imageFile);
-        }
-
-        // Wait for upload to complete and get URL
         final TaskSnapshot taskSnapshot = await uploadTask;
         imageUrl = await taskSnapshot.ref.getDownloadURL();
       }
 
-      // 3. Create the user profile in Firestore
-      await _firestore.collection('users').doc(credential.user!.uid).set({
+      // 3. Add user profile to Firestore
+      final userId = credential.user!.uid;
+      await _firestore.collection('users').doc(userId).set({
         'name': name,
         'email': email,
         'profileImage': imageUrl,
-        'defaultCurrency': 'USD',
+        'defaultCurrency': 'INR',
         'createdAt': FieldValue.serverTimestamp(),
       });
+
+      // 4. Set a default budget with auto-generated ID
+      final defaultBudget = Budget(
+        amount: 25000.0, // Default budget amount
+        period: 'monthly',
+        startDate: DateTime.now(),
+        currency: 'INR',
+      );
+
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('budgets')
+          .add(defaultBudget
+              .toMap()); // Firestore auto-generates the document ID
 
       return credential;
     } catch (e) {
@@ -320,21 +385,21 @@ class FirebaseService {
   }
 
   // Budget methods
-  Future<void> setBudget(Budget budget) async {
-    String? userId = _auth.currentUser?.uid;
-    if (userId == null) throw Exception('User not authenticated');
+  // Future<void> setBudget(Budget budget) async {
+  //   String? userId = _auth.currentUser?.uid;
+  //   if (userId == null) throw Exception('User not authenticated');
 
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('budgets')
-        .doc(budget.category)
-        .set({
-      'amount': budget.amount,
-      'period': budget.period,
-      'currency': budget.currency,
-    });
-  }
+  //   await _firestore
+  //       .collection('users')
+  //       .doc(userId)
+  //       .collection('budgets')
+  //       .doc(budget.category)
+  //       .set({
+  //     'amount': budget.amount,
+  //     'period': budget.period,
+  //     'currency': budget.currency,
+  //   });
+  // }
 
   Stream<List<Budget>> getBudgets() {
     String? userId = _auth.currentUser?.uid;
@@ -345,16 +410,35 @@ class FirebaseService {
         .doc(userId)
         .collection('budgets')
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) {
-              Map<String, dynamic> data = doc.data();
-              return Budget(
-                category: doc.id,
-                amount: data['amount'],
-                period: data['period'],
-                currency: data['currency'],
-                startDate: DateTime.now().toIso8601String(),
-              );
-            }).toList());
+        .map((querySnapshot) {
+      if (querySnapshot.docs.isEmpty) {
+        if (kDebugMode) {
+          print('No budget documents found for user $userId');
+        }
+        return [];
+      }
+
+      return querySnapshot.docs.map((doc) {
+        try {
+          Map<String, dynamic> data = doc.data();
+          if (kDebugMode) {
+            print('Budget data: $data');
+          }
+          return Budget(
+            amount: data['amount'] ?? 0.0,
+            period: data['period'] ?? 'monthly',
+            currency: data['currency'] ?? 'INR',
+            startDate:
+                (data['startDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          );
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error parsing budget document: $e');
+          }
+          rethrow;
+        }
+      }).toList();
+    });
   }
 
   Stream<List<String>> getCategories() {

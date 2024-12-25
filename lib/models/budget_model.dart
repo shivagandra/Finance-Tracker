@@ -1,14 +1,16 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Budget {
   final int? id;
-  final String category;
+  // final String category;
   final double amount;
   final String period;
-  final String startDate;
+  final DateTime startDate;
   final String currency;
 
   Budget({
     this.id,
-    required this.category,
+    // required this.category,
     required this.amount,
     required this.period,
     required this.startDate,
@@ -18,7 +20,7 @@ class Budget {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
-      'category': category,
+      // 'category': category,
       'amount': amount,
       'period': period,
       'startDate': startDate,
@@ -26,14 +28,12 @@ class Budget {
     };
   }
 
-  factory Budget.fromMap(Map<String, dynamic> map) {
+  factory Budget.fromMap(Map<String, dynamic> data) {
     return Budget(
-      id: map['id'],
-      category: map['category'],
-      amount: map['amount'],
-      period: map['period'],
-      startDate: map['startDate'],
-      currency: map['currency'] ?? 'USD',
+      amount: (data['amount'] as num).toDouble(), // Explicit conversion
+      period: data['period'] ?? '',
+      currency: data['currency'] ?? '',
+      startDate: (data['startDate'] as Timestamp).toDate(),
     );
   }
 }

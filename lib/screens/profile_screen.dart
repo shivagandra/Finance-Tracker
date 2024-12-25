@@ -26,6 +26,36 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadProfileData();
   }
 
+  // Future<void> _loadProfileData() async {
+  //   try {
+  //     final profile = await _firebaseService.getUserProfile();
+  //     final budgets = await _firebaseService.getBudgets().first;
+  //     final monthStart = DateTime(DateTime.now().year, DateTime.now().month, 1);
+  //     final monthEnd =
+  //         DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
+
+  //     final expenses = await _firebaseService.searchExpensesProfileScreen(
+  //       dateRange: DateTimeRange(start: monthStart, end: monthEnd),
+  //     );
+
+  //     if (mounted) {
+  //       setState(() {
+  //         _userProfile = profile;
+  //         _monthlyBudget = budgets.fold(
+  //             0.0, (sum, budget) => sum + (budget.amount as num).toDouble());
+  //         _monthlySpending = expenses.fold(
+  //             0.0, (sum, expense) => sum + (expense.amount as num).toDouble());
+  //         _isLoading = false;
+  //       });
+  //     }
+  //   } catch (e) {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text('Error loading profile: $e')),
+  //       );
+  //     }
+  //   }
+  // }
   Future<void> _loadProfileData() async {
     try {
       final profile = await _firebaseService.getUserProfile();
@@ -41,10 +71,17 @@ class _ProfilePageState extends State<ProfilePage> {
       if (mounted) {
         setState(() {
           _userProfile = profile;
-          _monthlyBudget =
-              budgets.fold(0.0, (sum, budget) => sum + budget.amount);
-          _monthlySpending =
-              expenses.fold(0.0, (sum, expense) => sum + expense.amount);
+
+          // Explicitly handle `amount` as a double
+          _monthlyBudget = budgets.fold(
+            0.0,
+            (sum, budget) => sum + ((budget.amount as num).toDouble()),
+          );
+
+          _monthlySpending = expenses.fold(
+            0.0,
+            (sum, expense) => sum + (expense.amount as num).toDouble(),
+          );
 
           _isLoading = false;
         });
@@ -201,7 +238,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         minHeight: 10,
                         backgroundColor: Colors.grey[200],
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          _monthlySpending > _monthlyBudget
+                          _monthlySpending > _monthlyBudget * 0.8
                               ? Colors.red
                               : Colors.green,
                         ),

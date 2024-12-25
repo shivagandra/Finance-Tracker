@@ -26,14 +26,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: AuthStateHandler(), //Scaffold(
-      //   appBar: AppBar(
-      //     backgroundColor: Colors.blueGrey,
-      //     elevation: 2,
-      //     title: const Text('Finance Tracker'),
-      //   ),
-      //   body: LoginScreen(),
-      // ),
+      home: AuthStateHandler(),
     );
   }
 }
