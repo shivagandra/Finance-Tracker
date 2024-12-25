@@ -32,3 +32,4 @@ node_modules/
 *.iml
 *.log
 package-lock.json
+.firebase
