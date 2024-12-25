@@ -1,8 +1,8 @@
 import 'dart:io';
-import 'dart:typed_data';
+// import 'dart:typed_data';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -25,11 +25,57 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   String? _selectedCurrency = 'INR'; // Default to INR, you can expand this
   XFile? _selectedImage;
   final FirebaseService _firebaseService = FirebaseService();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   bool _isLoading = false; // Added loading state
   String? _imageUrl;
 
+  // Future<void> _saveExpense() async {
+  //   if (_descriptionController.text.isEmpty ||
+  //       _amountController.text.isEmpty ||
+  //       _selectedCategory == null ||
+  //       _selectedCurrency == null) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Please fill out all fields')),
+  //     );
+  //     return;
+  //   }
+
+  //   ExpenseModel expense = ExpenseModel(
+  //     id: '',
+  //     amount: double.parse(_amountController.text),
+  //     category: _selectedCategory!,
+  //     description: _descriptionController.text,
+  //     date: DateTime.now(),
+  //     imagePath: _imageUrl,
+  //     currency: _selectedCurrency!,
+  //   );
+
+  //   setState(() {
+  //     _isLoading = true;
+  //   });
+
+  //   try {
+  //     await _firestore
+  //         .collection('users')
+  //         .doc(FirebaseAuth.instance.currentUser!.uid)
+  //         .collection('expenses')
+  //         .add(expense.toMap());
+
+  //     setState(() {
+  //       _isLoading = false;
+  //     });
+
+  //     Navigator.pop(context);
+  //   } catch (e) {
+  //     setState(() {
+  //       _isLoading = false;
+  //     });
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('Error saving expense: $e')),
+  //     );
+  //   }
+  // }
   Future<void> _saveExpense() async {
     if (_descriptionController.text.isEmpty ||
         _amountController.text.isEmpty ||
@@ -41,13 +87,17 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       return;
     }
 
+    // Assign placeholder if no image is selected
+    final imagePath = _imageUrl ??
+        'https://via.placeholder.com/150'; // Replace with your placeholder URL.
+
     ExpenseModel expense = ExpenseModel(
       id: '',
       amount: double.parse(_amountController.text),
       category: _selectedCategory!,
       description: _descriptionController.text,
       date: DateTime.now(),
-      imagePath: _imageUrl,
+      imagePath: imagePath,
       currency: _selectedCurrency!,
     );
 
@@ -56,21 +106,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     });
 
     try {
-      await _firestore
-          .collection('users')
-          .doc(FirebaseAuth.instance.currentUser!.uid)
-          .collection('expenses')
-          .add(expense.toMap());
-
-      setState(() {
-        _isLoading = false;
-      });
-
+      await _firebaseService.addExpense(expense);
+      setState(() => _isLoading = false);
       Navigator.pop(context);
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving expense: $e')),
       );
@@ -114,7 +154,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         }
       }
     } catch (e) {
-      print('Error picking image: $e');
+      if (kDebugMode) {
+        print('Error picking image: $e');
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error picking image: $e')),
       );

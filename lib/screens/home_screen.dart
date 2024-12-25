@@ -1,3 +1,4 @@
+// import 'package:finance_tracker/screens/expenses_list_screen.dart';
 import 'package:finance_tracker/screens/expenses_view_screen.dart';
 import 'package:finance_tracker/screens/profile_screen.dart';
 import 'package:finance_tracker/screens/search_screen.dart';
@@ -18,9 +19,8 @@ class _HomeScreenState extends State<HomeScreen> {
     ProfilePage(),
   ];
 
-  int _selectedIndex = 0; // Track selected tab index
+  int _selectedIndex = 0;
 
-  // Function to change the selected tab
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
@@ -48,10 +48,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
-      body: _screens[_selectedIndex], // Display the selected screen
+      body: _screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex, // Set the current selected tab
-        onTap: _onItemTapped, // Handle tab change
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),

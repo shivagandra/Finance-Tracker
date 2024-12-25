@@ -19,23 +19,90 @@ class _SearchScreenState extends State<SearchScreen> {
   String? _selectedCategory;
   String? _selectedCurrency;
   List<ExpenseModel> _expenses = [];
-  bool _isLoading = false; // Added loading state
+  bool _isLoading = false;
+  bool _hasActiveFilters = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    if (_searchController.text.isEmpty && !_hasActiveFilters) {
+      setState(() {
+        _expenses = [];
+      });
+    } else {
+      _updateSearch();
+    }
+  }
+
+  void _checkActiveFilters() {
+    setState(() {
+      _hasActiveFilters = _selectedCategory != null ||
+          _selectedCurrency != null ||
+          _dateRange != null ||
+          _amountRange != const RangeValues(0, 1000);
+    });
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _selectedCategory = null;
+      _selectedCurrency = null;
+      _dateRange = null;
+      _amountRange = const RangeValues(0, 1000);
+      _hasActiveFilters = false;
+      if (_searchController.text.isEmpty) {
+        _expenses = [];
+      } else {
+        _updateSearch();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-          title: Text(
-        'Search Expenses',
-        style: TextStyle(
-          fontSize: 20,
-          color: hexToColor('#FF6F61'),
-          fontWeight: FontWeight.bold,
-          fontStyle: FontStyle.italic,
-          fontFamily: 'Times New Roman',
-          textBaseline: TextBaseline.alphabetic,
+        //     title: Text(
+        //   'Search Expenses',
+        //   style: TextStyle(
+        //     fontSize: 20,
+        //     color: hexToColor('#FF6F61'),
+        //     fontWeight: FontWeight.bold,
+        //     fontStyle: FontStyle.italic,
+        //     fontFamily: 'Times New Roman',
+        //     textBaseline: TextBaseline.alphabetic,
+        //   ),
+        // )
+        title: Text(
+          'Search Expenses',
+          style: TextStyle(
+            fontSize: 20,
+            color: hexToColor('#FF6F61'),
+            fontWeight: FontWeight.bold,
+            fontStyle: FontStyle.italic,
+            fontFamily: 'Times New Roman',
+          ),
         ),
-      )),
+        actions: [
+          if (_hasActiveFilters)
+            IconButton(
+              icon: const Icon(Icons.clear_all),
+              onPressed: _clearFilters,
+              tooltip: 'Clear all filters',
+            ),
+        ],
+      ),
       body: Column(
         children: [
           Padding(
@@ -46,9 +113,20 @@ class _SearchScreenState extends State<SearchScreen> {
                   controller: _searchController,
                   decoration: InputDecoration(
                     labelText: 'Search',
-                    suffixIcon: Icon(Icons.search),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () {
+                        _searchController.clear();
+                        if (!_hasActiveFilters) {
+                          setState(
+                            () {
+                              _expenses = [];
+                            },
+                          );
+                        }
+                      },
+                    ),
                   ),
-                  onChanged: _updateSearch,
                 ),
                 ExpansionTile(
                   title: Text('Filters'),
@@ -57,21 +135,30 @@ class _SearchScreenState extends State<SearchScreen> {
                       stream: _firebaseService.getCategories(),
                       builder: (context, snapshot) {
                         if (!snapshot.hasData) {
-                          return CircularProgressIndicator();
+                          return const CircularProgressIndicator();
                         }
                         return DropdownButton<String>(
                           value: _selectedCategory,
-                          hint: Text('Select Category'),
-                          items: snapshot.data!.map((category) {
-                            return DropdownMenuItem(
-                              value: category,
-                              child: Text(category),
-                            );
-                          }).toList(),
+                          hint: const Text('Select Category'),
+                          items: [
+                            const DropdownMenuItem(
+                              value: null,
+                              child: Text('All Categories'),
+                            ),
+                            ...snapshot.data!.map(
+                              (category) {
+                                return DropdownMenuItem(
+                                  value: category,
+                                  child: Text(category),
+                                );
+                              },
+                            ),
+                          ],
                           onChanged: (value) {
                             setState(() {
                               _selectedCategory = value;
-                              _updateSearch(); // Update search whenever a filter changes
+                              _checkActiveFilters();
+                              _updateSearch();
                             });
                           },
                         );
@@ -132,39 +219,75 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
           Expanded(
             child: _isLoading
-                ? Center(
-                    child:
-                        CircularProgressIndicator()) // Show loading indicator while fetching data
-                : ListView.builder(
-                    itemCount: _expenses.length,
-                    itemBuilder: (context, index) {
-                      final expense = _expenses[index];
-                      return ExpenseCard(expense: expense);
-                    },
-                  ),
+                ? const Center(child: CircularProgressIndicator())
+                : _expenses.isEmpty
+                    ? const Center(
+                        child: Text('No expenses found'),
+                      )
+                    : ListView.builder(
+                        itemCount: _expenses.length,
+                        itemBuilder: (context, index) {
+                          final expense = _expenses[index];
+                          return ExpenseCard(expense: expense);
+                        },
+                      ),
           ),
         ],
       ),
     );
   }
 
-  void _updateSearch([String? query]) async {
+  // void _updateSearch([String? query]) async {
+  //   setState(() {
+  //     _isLoading = true; // Set loading state to true before fetching data
+  //   });
+
+  //   final expenses = await _firebaseService.searchExpenses(
+  //     query: _searchController.text,
+  //     category: _selectedCategory,
+  //     currency: _selectedCurrency,
+  //     minAmount: _amountRange.start,
+  //     maxAmount: _amountRange.end,
+  //     dateRange: _dateRange,
+  //   );
+
+  //   setState(() {
+  //     _expenses = expenses;
+  //     _isLoading = false; // Set loading state to false after data is fetched
+  //   });
+  // }
+  void _updateSearch() async {
+    if (!mounted) return;
+
     setState(() {
-      _isLoading = true; // Set loading state to true before fetching data
+      _isLoading = true;
     });
 
-    final expenses = await _firebaseService.searchExpenses(
-      query: _searchController.text,
-      category: _selectedCategory,
-      currency: _selectedCurrency,
-      minAmount: _amountRange.start,
-      maxAmount: _amountRange.end,
-      dateRange: _dateRange,
-    );
+    try {
+      final expenses = await _firebaseService.searchExpenses(
+        query: _searchController.text,
+        category: _selectedCategory,
+        currency: _selectedCurrency,
+        minAmount: _amountRange.start,
+        maxAmount: _amountRange.end,
+        dateRange: _dateRange,
+      );
 
-    setState(() {
-      _expenses = expenses;
-      _isLoading = false; // Set loading state to false after data is fetched
-    });
+      if (mounted) {
+        setState(() {
+          _expenses = expenses;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error searching expenses: $e')),
+        );
+      }
+    }
   }
 }

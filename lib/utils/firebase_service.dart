@@ -75,7 +75,9 @@ class FirebaseService {
 
       return credential;
     } catch (e) {
-      print('Error during registration: $e');
+      if (kDebugMode) {
+        print('Error during registration: $e');
+      }
       rethrow;
     }
   }
@@ -101,34 +103,6 @@ class FirebaseService {
     await _firestore.collection('users').doc(userId).update(data);
   }
 
-  // Future<String?> updateProfileImage() async {
-  //   String? userId = _auth.currentUser?.uid;
-  //   if (userId == null) throw Exception('User not authenticated');
-
-  //   final ImagePicker picker = ImagePicker();
-  //   final XFile? image = await picker.pickImage(
-  //     source: ImageSource.gallery,
-  //     maxWidth: 1024,
-  //     maxHeight: 1024,
-  //     imageQuality: 85,
-  //   );
-
-  //   if (image == null) return null;
-
-  //   return await _uploadProfileImage(File(image.path), userId);
-  // }
-
-  // Future<String> _uploadProfileImage(File imageFile, String userId) async {
-  //   String fileName = 'profile_$userId.jpg';
-  //   Reference ref = _storage.ref().child('profile_images/$fileName');
-
-  //   try {
-  //     await ref.delete();
-  //   } catch (_) {}
-
-  //   await ref.putFile(imageFile);
-  //   return await ref.getDownloadURL();
-  // }
   Future<String?> updateProfileImage() async {
     try {
       final ImagePicker picker = ImagePicker();
@@ -179,26 +153,44 @@ class FirebaseService {
 
       return downloadUrl;
     } catch (e) {
-      print('Error uploading profile image: $e');
+      if (kDebugMode) {
+        print('Error uploading profile image: $e');
+      }
       rethrow;
     }
   }
 
-  // Future<void> updateUserProfile(Map<String, dynamic> data) async {
+  // Expense methods
+  // Future<void> addExpense(ExpenseModel expense) async {
   //   String? userId = _auth.currentUser?.uid;
   //   if (userId == null) throw Exception('User not authenticated');
 
-  //   await _firestore.collection('users').doc(userId).update(data);
-  // }
+  //   String? imageUrl;
+  //   if (expense.imagePath != null) {
+  //     imageUrl = await _uploadExpenseImage(File(expense.imagePath!));
+  //   }
 
-  // Expense methods
+  //   await _firestore
+  //       .collection('users')
+  //       .doc(userId)
+  //       .collection('expenses')
+  //       .add({
+  //     'amount': expense.amount,
+  //     'category': expense.category,
+  //     'description': expense.description,
+  //     'date': expense.date,
+  //     'imageUrl': imageUrl,
+  //     'currency': expense.currency,
+  //     'timestamp': FieldValue.serverTimestamp(),
+  //   });
+  // }
   Future<void> addExpense(ExpenseModel expense) async {
     String? userId = _auth.currentUser?.uid;
     if (userId == null) throw Exception('User not authenticated');
 
-    String? imageUrl;
-    if (expense.imagePath != null) {
-      imageUrl = await _uploadExpenseImage(File(expense.imagePath!));
+    String? imageUrl = expense.imagePath;
+    if (expense.imagePath != null && !expense.imagePath!.startsWith('http')) {
+      imageUrl = await uploadExpenseImage(expense.imagePath!);
     }
 
     await _firestore
@@ -209,10 +201,9 @@ class FirebaseService {
       'amount': expense.amount,
       'category': expense.category,
       'description': expense.description,
-      'date': expense.date,
-      'imageUrl': imageUrl,
+      'date': expense.date.toIso8601String(),
+      'imageUrl': imageUrl ?? 'https://via.placeholder.com/150',
       'currency': expense.currency,
-      'timestamp': FieldValue.serverTimestamp(),
     });
   }
 
@@ -232,12 +223,12 @@ class FirebaseService {
     });
   }
 
-  Future<String> _uploadExpenseImage(File imageFile) async {
-    String fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-    Reference ref = _storage.ref().child('expense_images/$fileName');
-    await ref.putFile(imageFile);
-    return await ref.getDownloadURL();
-  }
+  // Future<String> _uploadExpenseImage(File imageFile) async {
+  //   String fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+  //   Reference ref = _storage.ref().child('expense_images/$fileName');
+  //   await ref.putFile(imageFile);
+  //   return await ref.getDownloadURL();
+  // }
 
   Stream<List<ExpenseModel>> getExpenses() {
     String? userId = _auth.currentUser?.uid;
@@ -263,51 +254,6 @@ class FirebaseService {
             }).toList());
   }
 
-  // Search Expenses methods
-  // Future<List<ExpenseModel>> searchExpenses({
-  //   String? query,
-  //   String? category,
-  //   String? currency,
-  //   double? minAmount,
-  //   double? maxAmount,
-  //   DateTimeRange? dateRange,
-  // }) async {
-  //   String? userId = _auth.currentUser?.uid;
-  //   if (userId == null) throw Exception('User not authenticated');
-
-  //   Query expensesQuery =
-  //       _firestore.collection('users').doc(userId).collection('expenses');
-
-  //   if (category != null) {
-  //     expensesQuery = expensesQuery.where('category', isEqualTo: category);
-  //   }
-  //   if (currency != null) {
-  //     expensesQuery = expensesQuery.where('currency', isEqualTo: currency);
-  //   }
-  //   if (dateRange != null) {
-  //     expensesQuery = expensesQuery
-  //         .where('date',
-  //             isGreaterThanOrEqualTo: dateRange.start.toIso8601String())
-  //         .where('date', isLessThanOrEqualTo: dateRange.end.toIso8601String());
-  //   }
-
-  //   QuerySnapshot snapshot = await expensesQuery.get();
-
-  //   return snapshot.docs.map((doc) {
-  //     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-  //     return ExpenseModel.fromMap(data);
-  //   }).where((expense) {
-  //     if (minAmount != null && expense.amount < minAmount) return false;
-  //     if (maxAmount != null && expense.amount > maxAmount) return false;
-  //     if (query != null && query.isNotEmpty) {
-  //       return expense.description
-  //               .toLowerCase()
-  //               .contains(query.toLowerCase()) ||
-  //           expense.category.toLowerCase().contains(query.toLowerCase());
-  //     }
-  //     return true;
-  //   }).toList();
-  // }
   Future<List<ExpenseModel>> searchExpenses({
     String? query,
     String? category,
@@ -317,48 +263,54 @@ class FirebaseService {
     DateTimeRange? dateRange,
   }) async {
     try {
-      // Build Firestore query
-      var querySnapshot = _firestore
+      Query<Map<String, dynamic>> queryRef = _firestore
           .collection('users')
           .doc(FirebaseAuth.instance.currentUser!.uid)
-          .collection('expenses')
-          .orderBy('date') // Order by date for better performance
-          .limit(10); // Limit to 10 for pagination
+          .collection('expenses');
 
-      // Add filters based on user input
       if (query != null && query.isNotEmpty) {
-        querySnapshot = querySnapshot
+        query = query.toLowerCase(); // Normalize the query
+        queryRef = queryRef
+            .orderBy('description')
             .where('description', isGreaterThanOrEqualTo: query)
             .where('description', isLessThanOrEqualTo: '$query\uf8ff');
       }
+
       if (category != null && category.isNotEmpty) {
-        querySnapshot = querySnapshot.where('category', isEqualTo: category);
+        queryRef = queryRef.where('category', isEqualTo: category);
       }
       if (currency != null && currency.isNotEmpty) {
-        querySnapshot = querySnapshot.where('currency', isEqualTo: currency);
+        queryRef = queryRef.where('currency', isEqualTo: currency);
       }
       if (minAmount != null) {
-        querySnapshot =
-            querySnapshot.where('amount', isGreaterThanOrEqualTo: minAmount);
+        queryRef = queryRef.where('amount', isGreaterThanOrEqualTo: minAmount);
       }
       if (maxAmount != null) {
-        querySnapshot =
-            querySnapshot.where('amount', isLessThanOrEqualTo: maxAmount);
+        queryRef = queryRef.where('amount', isLessThanOrEqualTo: maxAmount);
       }
       if (dateRange != null) {
-        querySnapshot = querySnapshot
-            .where('date', isGreaterThanOrEqualTo: dateRange.start)
-            .where('date', isLessThanOrEqualTo: dateRange.end);
+        queryRef = queryRef
+            .where('date',
+                isGreaterThanOrEqualTo: Timestamp.fromDate(dateRange.start))
+            .where('date',
+                isLessThanOrEqualTo: Timestamp.fromDate(dateRange.end));
       }
 
-      // Fetch documents from Firestore
-      final snapshot = await querySnapshot.get();
+      // Fetch data from Firestore
+      final snapshot = await queryRef.get();
+
+      // Debugging: Log the results
+      print('Query returned ${snapshot.docs.length} documents');
+      for (var doc in snapshot.docs) {
+        print(doc.data());
+      }
+
       final expenses =
           snapshot.docs.map((doc) => ExpenseModel.fromFirestore(doc)).toList();
 
       return expenses;
     } catch (e) {
-      print("Error fetching expenses: $e");
+      print('Error fetching expenses: $e');
       return [];
     }
   }
@@ -471,41 +423,289 @@ class FirebaseService {
           .map((doc) => ExpenseModel.fromFirestore(doc))
           .toList();
     } catch (e) {
-      print("Error fetching expenses: $e");
+      if (kDebugMode) {
+        print("Error fetching expenses: $e");
+      }
       rethrow;
     }
   }
 
-  // // Add multiple categories to the "categories" collection
-  // Future<void> addCategories() async {
-  //   try {
-  //     // List of categories to add
-  //     List<Map<String, dynamic>> categories = [
-  //       {'name': 'Food', 'color': 0xFFFF0000}, // Example color value (red)
-  //       {'name': 'Transportation', 'color': 0xFF00FF00}, // Green
-  //       {'name': 'Utilities', 'color': 0xFF0000FF}, // Blue
-  //       {'name': 'Health', 'color': 0xFF00FFFF}, // Cyan
-  //       {'name': 'Entertainment', 'color': 0xFFFF00FF}, // Magenta
-  //     ];
-  //
-  //     // Create a batch write to add all categories in a single operation
-  //     WriteBatch batch = _firestore.batch();
-  //
-  //     for (var category in categories) {
-  //       // Use category name as document ID
-  //       DocumentReference categoryRef =
-  //           _firestore.collection('categories').doc(category['name']);
-  //       batch.set(categoryRef, {
-  //         'name': category['name'],
-  //         'color': category['color'],
-  //       });
-  //     }
-  //
-  //     // Commit the batch write
-  //     await batch.commit();
-  //     // print('Categories added successfully');
-  //   } catch (e) {
-  //     // print('Error adding categories: $e');
-  //   }
-  // }
+  Future<void> updateProfileWithBudget({
+    required String? imageUrl,
+    required double monthlyBudget,
+    required String currency,
+  }) async {
+    try {
+      final String userId = _auth.currentUser?.uid ?? '';
+      if (userId.isEmpty) throw Exception('User not authenticated');
+
+      // Create a batch write
+      WriteBatch batch = _firestore.batch();
+
+      // Update profile document
+      DocumentReference userRef = _firestore.collection('users').doc(userId);
+      Map<String, dynamic> updateData = {
+        'monthlyBudget': monthlyBudget,
+        'defaultCurrency': currency,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      };
+
+      if (imageUrl != null) {
+        updateData['profileImage'] = imageUrl;
+      }
+
+      batch.update(userRef, updateData);
+
+      // Update or create monthly budget document
+      DocumentReference budgetRef = _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('budgets')
+          .doc('monthly');
+
+      batch.set(
+          budgetRef,
+          {
+            'amount': monthlyBudget,
+            'currency': currency,
+            'period': 'monthly',
+            'startDate': DateTime.now().toIso8601String(),
+          },
+          SetOptions(merge: true));
+
+      // Commit the batch
+      await batch.commit();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error updating profile and budget: $e');
+      }
+      rethrow;
+    }
+  }
+
+  Future<double> getMonthlySpending() async {
+    try {
+      final String userId = _auth.currentUser?.uid ?? '';
+      if (userId.isEmpty) throw Exception('User not authenticated');
+
+      // Get the start and end of the current month
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+
+      final querySnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('expenses')
+          .where('date', isGreaterThanOrEqualTo: startOfMonth)
+          .where('date', isLessThanOrEqualTo: endOfMonth)
+          .get();
+
+      double totalSpending = 0;
+      for (var doc in querySnapshot.docs) {
+        totalSpending += (doc.data()['amount'] as num).toDouble();
+      }
+
+      return totalSpending;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error calculating monthly spending: $e');
+      }
+      rethrow;
+    }
+  }
+
+  // Add this method to refresh expenses automatically
+  Stream<List<ExpenseModel>> getExpensesStream() {
+    final String userId = _auth.currentUser?.uid ?? '';
+    if (userId.isEmpty) throw Exception('User not authenticated');
+
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('expenses')
+        .orderBy('date', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => ExpenseModel.fromFirestore(doc))
+            .toList());
+  }
+
+  Future<String?> uploadExpenseImage(String imagePath) async {
+    try {
+      String? userId = _auth.currentUser?.uid;
+      if (userId == null) throw Exception('User not authenticated');
+
+      // Generate a unique filename using timestamp and random string
+      final String fileName =
+          'expense_${DateTime.now().millisecondsSinceEpoch}_$userId.jpg';
+      final Reference storageRef =
+          _storage.ref().child('expense_images/$fileName');
+
+      UploadTask uploadTask;
+
+      if (kIsWeb) {
+        // For web platform
+        final XFile imageFile = XFile(imagePath);
+        final Uint8List imageBytes = await imageFile.readAsBytes();
+        uploadTask = storageRef.putData(
+          imageBytes,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+      } else {
+        // For mobile platforms
+        final File imageFile = File(imagePath);
+        final Uint8List imageBytes = await imageFile.readAsBytes();
+        uploadTask = storageRef.putData(
+          imageBytes,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+      }
+
+      // Wait for the upload to complete and get URL
+      final TaskSnapshot taskSnapshot = await uploadTask;
+      final String downloadUrl = await taskSnapshot.ref.getDownloadURL();
+
+      return downloadUrl;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error uploading image: $e');
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> updateExpense(ExpenseModel expense) async {
+    String? userId = _auth.currentUser?.uid;
+    if (userId == null) throw Exception('User not authenticated');
+
+    try {
+      // Reference to the expense document
+      final docRef = _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('expenses')
+          .doc(expense.id);
+
+      // Check if document exists
+      final docSnapshot = await docRef.get();
+      if (!docSnapshot.exists) {
+        throw Exception('Expense document not found');
+      }
+
+      String? imageUrl;
+      // Handle image update
+      if (expense.imagePath != null) {
+        if (!expense.imagePath!.startsWith('http')) {
+          // New image file to upload
+          try {
+            imageUrl = await uploadExpenseImage(expense.imagePath!);
+            if (imageUrl == null) {
+              throw Exception('Failed to upload image');
+            }
+
+            // If successful upload and there was an old image, delete it
+            final oldData = docSnapshot.data() as Map<String, dynamic>;
+            if (oldData['imageUrl'] != null &&
+                oldData['imageUrl'].toString().startsWith('http')) {
+              try {
+                // Extract old image path from URL
+                final oldImageRef =
+                    FirebaseStorage.instance.refFromURL(oldData['imageUrl']);
+                await oldImageRef.delete();
+              } catch (e) {
+                // Log error but don't fail the update
+                if (kDebugMode) {
+                  print('Warning: Failed to delete old image: $e');
+                }
+              }
+            }
+          } catch (uploadError) {
+            throw Exception('Error uploading new image: $uploadError');
+          }
+        } else {
+          // Existing image URL, keep it
+          imageUrl = expense.imagePath;
+        }
+      } else {
+        // If imagePath is null and there was an old image, delete it
+        final oldData = docSnapshot.data() as Map<String, dynamic>;
+        if (oldData['imageUrl'] != null &&
+            oldData['imageUrl'].toString().startsWith('http')) {
+          try {
+            final oldImageRef =
+                FirebaseStorage.instance.refFromURL(oldData['imageUrl']);
+            await oldImageRef.delete();
+          } catch (e) {
+            if (kDebugMode) {
+              print('Warning: Failed to delete old image: $e');
+            }
+          }
+        }
+      }
+
+      // Create update data map
+      Map<String, dynamic> updateData = {
+        'amount': expense.amount,
+        'category': expense.category,
+        'description': expense.description,
+        'date': expense.date.toIso8601String(),
+        'currency': expense.currency,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      // Handle image URL in update data
+      if (imageUrl != null) {
+        updateData['imageUrl'] = imageUrl;
+      } else {
+        // If no image URL, remove the field from Firestore
+        updateData['imageUrl'] = FieldValue.delete();
+      }
+
+      // Update the document with transaction to ensure atomicity
+      await _firestore.runTransaction((transaction) async {
+        final freshSnapshot = await transaction.get(docRef);
+        if (!freshSnapshot.exists) {
+          throw Exception('Expense document was deleted during update');
+        }
+        transaction.update(docRef, updateData);
+      });
+    } catch (e) {
+      if (e is FirebaseException) {
+        switch (e.code) {
+          case 'permission-denied':
+            throw Exception(
+                'You do not have permission to update this expense');
+          case 'not-found':
+            throw Exception('The expense no longer exists');
+          case 'unavailable':
+            throw Exception(
+                'Service temporarily unavailable. Please try again');
+          case 'cancelled':
+            throw Exception('Operation cancelled. Please try again');
+          default:
+            throw Exception('Firebase error: ${e.message}');
+        }
+      }
+      // Re-throw the custom exceptions we created
+      if (e is Exception) {
+        rethrow;
+      }
+      // For any other errors
+      throw Exception('Error updating expense: $e');
+    }
+  }
+
+  Future<bool> checkExpenseExists(String expenseId) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('expenses')
+          .doc(expenseId)
+          .get();
+      return snapshot.exists; // Returns true if the document exists
+    } catch (e) {
+      debugPrint('Error checking expense existence: $e');
+      return false; // Assume it doesn't exist if there's an error
+    }
+  }
 }
