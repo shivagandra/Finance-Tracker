@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import 'package:finance_tracker/models/expense_model.dart';
+import 'package:finance_tracker/utils/expense_service.dart';
 import 'package:finance_tracker/utils/firebase_service.dart';
 
 class AddExpenseScreen extends StatefulWidget {

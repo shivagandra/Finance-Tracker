@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+// import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:finance_tracker/screens/login_screen.dart';
 import 'package:finance_tracker/utils/firebase_service.dart';
@@ -33,7 +33,8 @@ class _ProfilePageState extends State<ProfilePage> {
       final monthStart = DateTime(DateTime.now().year, DateTime.now().month, 1);
       final monthEnd =
           DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
-      final expenses = await _firebaseService.searchExpenses(
+
+      final expenses = await _firebaseService.searchExpensesProfileScreen(
         dateRange: DateTimeRange(start: monthStart, end: monthEnd),
       );
 
@@ -44,6 +45,7 @@ class _ProfilePageState extends State<ProfilePage> {
               budgets.fold(0.0, (sum, budget) => sum + budget.amount);
           _monthlySpending =
               expenses.fold(0.0, (sum, expense) => sum + expense.amount);
+
           _isLoading = false;
         });
       }
@@ -122,19 +124,18 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: Stack(
                   alignment: Alignment.bottomRight,
                   children: [
-                    CachedNetworkImage(
-                      imageUrl: _userProfile?['profileImage'] ?? '',
-                      imageBuilder: (context, imageProvider) => CircleAvatar(
-                        radius: 50,
-                        backgroundImage: imageProvider,
+                    CircleAvatar(
+                      radius: 50, // Adjust the radius as needed
+                      backgroundImage: NetworkImage(
+                        _userProfile?['profileImage'] ??
+                            '', // Your image URL here
                       ),
-                      placeholder: (context, url) =>
-                          const CircularProgressIndicator(),
-                      errorWidget: (context, url, error) =>
-                          const Icon(Icons.error),
-                      httpHeaders: {
-                        'Access-Control-Allow-Origin': '*',
-                      },
+                      backgroundColor: Colors.grey[
+                          200], // Fallback background color if image fails to load
+                      child: _userProfile?['profileImage'] == null
+                          ? const Icon(Icons.person,
+                              size: 50) // Placeholder icon if no image
+                          : null, // If image exists, no child is required
                     ),
                     Container(
                       padding: const EdgeInsets.all(4),

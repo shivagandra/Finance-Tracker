@@ -2,12 +2,14 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:finance_tracker/models/budget_model.dart';
-import 'package:finance_tracker/models/expense_model.dart';
+import 'package:finance_tracker/utils/expense_service.dart';
+import 'package:finance_tracker/screens/profile_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart';
 // import 'dart:typed_data';
 
 class FirebaseService {
@@ -160,30 +162,6 @@ class FirebaseService {
     }
   }
 
-  // Expense methods
-  // Future<void> addExpense(ExpenseModel expense) async {
-  //   String? userId = _auth.currentUser?.uid;
-  //   if (userId == null) throw Exception('User not authenticated');
-
-  //   String? imageUrl;
-  //   if (expense.imagePath != null) {
-  //     imageUrl = await _uploadExpenseImage(File(expense.imagePath!));
-  //   }
-
-  //   await _firestore
-  //       .collection('users')
-  //       .doc(userId)
-  //       .collection('expenses')
-  //       .add({
-  //     'amount': expense.amount,
-  //     'category': expense.category,
-  //     'description': expense.description,
-  //     'date': expense.date,
-  //     'imageUrl': imageUrl,
-  //     'currency': expense.currency,
-  //     'timestamp': FieldValue.serverTimestamp(),
-  //   });
-  // }
   Future<void> addExpense(ExpenseModel expense) async {
     String? userId = _auth.currentUser?.uid;
     if (userId == null) throw Exception('User not authenticated');
@@ -299,33 +277,46 @@ class FirebaseService {
       // Fetch data from Firestore
       final snapshot = await queryRef.get();
 
-      // Debugging: Log the results
-      print('Query returned ${snapshot.docs.length} documents');
-      for (var doc in snapshot.docs) {
-        print(doc.data());
-      }
-
       final expenses =
           snapshot.docs.map((doc) => ExpenseModel.fromFirestore(doc)).toList();
 
       return expenses;
     } catch (e) {
-      print('Error fetching expenses: $e');
+      // print('Error fetching expenses: $e');
       return [];
     }
   }
 
-  Future<List<ExpenseModel>> searchExpensesProfileScreen(
-      {required DateTimeRange dateRange}) async {
-    final querySnapshot = await FirebaseFirestore.instance
-        .collection('expenses')
-        .where('date', isGreaterThanOrEqualTo: dateRange.start)
-        .where('date', isLessThanOrEqualTo: dateRange.end)
-        .get();
+  String? getUserId() {
+    final user = FirebaseAuth.instance.currentUser;
+    return user
+        ?.uid; // Return the UID of the current user, or null if no user is signed in.
+  }
 
-    return querySnapshot.docs.map((doc) {
-      return ExpenseModel.fromFirestore(doc);
-    }).toList();
+  Future<List<ExpenseModel>> searchExpensesProfileScreen({
+    required DateTimeRange dateRange,
+  }) async {
+    final querySnapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(getUserId())
+        .collection('expenses')
+        .get(); // Get all expenses
+
+    // Filter records based on the date in Dart code
+    List<ExpenseModel> expenses = querySnapshot.docs
+        .where((doc) {
+          final dateString = doc['date']; // Assuming 'date' is a String
+          final expenseDate =
+              DateTime.parse(dateString); // Convert the string to DateTime
+
+          // Compare the dates
+          return expenseDate.isAfter(dateRange.start) &&
+              expenseDate.isBefore(dateRange.end);
+        })
+        .map((doc) => ExpenseModel.fromFirestore(doc))
+        .toList();
+
+    return expenses;
   }
 
   // Budget methods
@@ -364,21 +355,6 @@ class FirebaseService {
                 startDate: DateTime.now().toIso8601String(),
               );
             }).toList());
-  }
-
-  // Category methods
-  Future<void> addCategory(String name, int color) async {
-    String? userId = _auth.currentUser?.uid;
-    if (userId == null) throw Exception('User not authenticated');
-
-    await _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('categories')
-        .add({
-      'name': name,
-      'color': color,
-    });
   }
 
   Stream<List<String>> getCategories() {
@@ -687,18 +663,169 @@ class FirebaseService {
             throw Exception('Firebase error: ${e.message}');
         }
       }
-      // Re-throw the custom exceptions we created
-      if (e is Exception) {
+      // Handle custom exception for document deletion
+      if (e.toString() ==
+          'Exception: Expense document was deleted during update') {
+        // Show a message to the user and reload the data
+        ScaffoldMessenger.of(context as BuildContext).showSnackBar(
+          SnackBar(
+              content: Text(
+                  'The expense was deleted or no longer exists. Please refresh the list.')),
+        );
+        // Optionally, reload the expense list
+        // Refresh the data or navigate to another screen
+        MaterialPageRoute(builder: (context) => ProfilePage());
+      } else {
+        // Re-throw the custom exceptions or unexpected errors
         rethrow;
       }
-      // For any other errors
-      throw Exception('Error updating expense: $e');
     }
   }
+
+  // Future<void> updateExpense(ExpenseModel expense) async {
+  //   String? userId = _auth.currentUser?.uid;
+  //   if (userId == null) throw Exception('User not authenticated');
+
+  //   try {
+  //     // Reference to the expense document
+  //     final docRef = _firestore
+  //         .collection('users')
+  //         .doc(userId)
+  //         .collection('expenses')
+  //         .doc(expense.id);
+
+  //     // Retry mechanism for fetching the document
+  //     int retryCount = 0;
+  //     DocumentSnapshot? docSnapshot;
+  //     while (retryCount < 3) {
+  //       try {
+  //         docSnapshot = await docRef.get();
+  //         if (docSnapshot.exists) {
+  //           break; // Document exists, proceed with the update
+  //         } else {
+  //           throw Exception('Expense document not found');
+  //         }
+  //       } catch (e) {
+  //         retryCount++;
+  //         if (retryCount == 3) {
+  //           throw Exception('Failed to fetch document after multiple attempts');
+  //         }
+  //         await Future.delayed(
+  //             const Duration(seconds: 2)); // Wait before retrying
+  //       }
+  //     }
+
+  //     // Now docSnapshot is guaranteed to be assigned
+  //     if (docSnapshot == null || !docSnapshot.exists) {
+  //       throw Exception('Expense document not found');
+  //     }
+
+  //     String? imageUrl;
+  //     // Handle image update
+  //     if (expense.imagePath != null) {
+  //       if (!expense.imagePath!.startsWith('http')) {
+  //         // New image file to upload
+  //         try {
+  //           imageUrl = await uploadExpenseImage(expense.imagePath!);
+  //           if (imageUrl == null) {
+  //             throw Exception('Failed to upload new image');
+  //           }
+
+  //           // If successful upload and there was an old image, delete it
+  //           final oldData = docSnapshot.data() as Map<String, dynamic>;
+  //           if (oldData['imageUrl'] != null &&
+  //               oldData['imageUrl'].toString().startsWith('http')) {
+  //             try {
+  //               // Extract old image path from URL and delete
+  //               final oldImageRef =
+  //                   FirebaseStorage.instance.refFromURL(oldData['imageUrl']);
+  //               await oldImageRef.delete();
+  //             } catch (e) {
+  //               print('Warning: Failed to delete old image: $e');
+  //             }
+  //           }
+  //         } catch (uploadError) {
+  //           print('Error uploading new image: $uploadError');
+  //           throw Exception('Error uploading new image');
+  //         }
+  //       } else {
+  //         // Existing image URL, keep it
+  //         imageUrl = expense.imagePath;
+  //       }
+  //     } else {
+  //       // If imagePath is null and there was an old image, delete it
+  //       final oldData = docSnapshot.data() as Map<String, dynamic>;
+  //       if (oldData['imageUrl'] != null &&
+  //           oldData['imageUrl'].toString().startsWith('http')) {
+  //         try {
+  //           final oldImageRef =
+  //               FirebaseStorage.instance.refFromURL(oldData['imageUrl']);
+  //           await oldImageRef.delete();
+  //         } catch (e) {
+  //           print('Warning: Failed to delete old image: $e');
+  //         }
+  //       }
+  //     }
+
+  //     // Prepare the data for update
+  //     Map<String, dynamic> updateData = {
+  //       'amount': expense.amount,
+  //       'category': expense.category,
+  //       'description': expense.description,
+  //       'date': expense.date.toIso8601String(),
+  //       'currency': expense.currency,
+  //       'updatedAt': FieldValue.serverTimestamp(),
+  //     };
+
+  //     // Include image URL if available
+  //     if (imageUrl != null) {
+  //       updateData['imageUrl'] = imageUrl;
+  //     } else {
+  //       // If no image URL, delete the image field from Firestore
+  //       updateData['imageUrl'] = FieldValue.delete();
+  //     }
+
+  //     // Firestore transaction to ensure atomicity
+  //     await _firestore.runTransaction((transaction) async {
+  //       final freshSnapshot = await transaction.get(docRef);
+  //       if (!freshSnapshot.exists) {
+  //         throw Exception('Expense document was deleted during update');
+  //       }
+  //       transaction.update(docRef, updateData);
+  //     });
+  //   } catch (e) {
+  //     if (e is FirebaseException) {
+  //       switch (e.code) {
+  //         case 'permission-denied':
+  //           throw Exception(
+  //               'You do not have permission to update this expense');
+  //         case 'not-found':
+  //           throw Exception('The expense no longer exists');
+  //         case 'unavailable':
+  //           throw Exception(
+  //               'Service temporarily unavailable. Please try again');
+  //         case 'cancelled':
+  //           throw Exception('Operation cancelled. Please try again');
+  //         default:
+  //           throw Exception('Firebase error: ${e.message}');
+  //       }
+  //     }
+
+  //     // Re-throw the custom exceptions
+  //     if (e is Exception) {
+  //       rethrow;
+  //     }
+
+  //     // For any other errors
+  //     throw Exception('Error updating expense: $e');
+  //   }
+  // }
 
   Future<bool> checkExpenseExists(String expenseId) async {
     try {
       final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(FirebaseAuth.instance.currentUser!.uid)
           .collection('expenses')
           .doc(expenseId)
           .get();

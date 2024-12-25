@@ -1,9 +1,10 @@
 import 'package:finance_tracker/screens/expense_edit_screen.dart';
-import 'package:flutter/material.dart';
-import 'package:finance_tracker/models/expense_model.dart';
 import 'package:finance_tracker/utils/firebase_service.dart';
+import 'package:flutter/material.dart';
+import 'package:finance_tracker/utils/expense_service.dart';
 import 'package:intl/intl.dart';
 import 'package:finance_tracker/screens/add_expense_screen.dart';
+import 'package:transparent_image/transparent_image.dart';
 
 class ExpenseViewScreen extends StatefulWidget {
   const ExpenseViewScreen({super.key});
@@ -13,6 +14,7 @@ class ExpenseViewScreen extends StatefulWidget {
 }
 
 class _ExpenseViewScreenState extends State<ExpenseViewScreen> {
+  final ExpenseService _expenseService = ExpenseService();
   final FirebaseService _firebaseService = FirebaseService();
   final List<ExpenseModel> _expenses = [];
   bool _isLoading = false;
@@ -32,7 +34,7 @@ class _ExpenseViewScreenState extends State<ExpenseViewScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final newExpenses = await _firebaseService.getMonthlyExpenses(
+      final newExpenses = await _expenseService.getExpensesByCategory(
         category: _selectedCategory,
       );
 
@@ -62,21 +64,35 @@ class _ExpenseViewScreenState extends State<ExpenseViewScreen> {
     await _loadExpenses();
   }
 
-  void _viewExpenseDetails(ExpenseModel expense) {
-    Navigator.push(
+  Future<void> _deleteExpense(ExpenseModel expense) async {
+    try {
+      await _expenseService.deleteExpense(expense.id);
+      setState(() {
+        _expenses.removeWhere((e) => e.id == expense.id);
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Expense deleted successfully')),
+      );
+    } catch (e) {
+      _showError('Failed to delete expense: <span class="math-inline">e');
+    }
+  }
+
+  void _viewExpenseDetails(ExpenseModel expense) async {
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ExpenseDetailScreen(
           expense: expense,
-          onExpenseUpdated:
-              _refreshExpenses, // Pass the callback for refreshing expenses
+          onExpenseUpdated: _refreshExpenses,
+          onExpenseDeleted: () => _deleteExpense(expense),
         ),
       ),
-    ).then((updated) {
-      if (updated == true) {
-        _refreshExpenses(); // Ensure the parent screen's list is updated
-      }
-    });
+    );
+    if (result != null && result) {
+      _refreshExpenses();
+    }
   }
 
   @override
@@ -100,9 +116,7 @@ class _ExpenseViewScreenState extends State<ExpenseViewScreen> {
             MaterialPageRoute(
               builder: (context) => const AddExpenseScreen(),
             ),
-          ).then((_) {
-            _refreshExpenses();
-          });
+          ).then((_) => _refreshExpenses());
         },
         child: const Icon(Icons.add),
       ),
@@ -118,7 +132,6 @@ class _ExpenseViewScreenState extends State<ExpenseViewScreen> {
           if (!snapshot.hasData) {
             return const SizedBox(height: 48);
           }
-
           return DropdownButtonFormField<String>(
             value: _selectedCategory,
             decoration: const InputDecoration(
@@ -157,7 +170,6 @@ class _ExpenseViewScreenState extends State<ExpenseViewScreen> {
           ? const Center(child: CircularProgressIndicator())
           : const Center(child: Text('No expenses found'));
     }
-
     return ListView.builder(
       padding: const EdgeInsets.all(8),
       itemCount: _expenses.length + (_hasMore ? 1 : 0),
@@ -171,32 +183,42 @@ class _ExpenseViewScreenState extends State<ExpenseViewScreen> {
             ),
           );
         }
-
         final expense = _expenses[index];
-        return Card(
-          elevation: 2,
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          child: ListTile(
-            onTap: () => _viewExpenseDetails(expense),
-            leading: CircleAvatar(
-              backgroundColor: Theme.of(context).primaryColor,
-              child: Text(
-                expense.category[0].toUpperCase(),
-                style: const TextStyle(color: Colors.white),
+        return Dismissible(
+          key: Key(expense.id),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            color: Colors.red,
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 16),
+            child: const Icon(Icons.delete, color: Colors.white),
+          ),
+          onDismissed: (_) => _deleteExpense(expense),
+          child: Card(
+            elevation: 2,
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            child: ListTile(
+              onTap: () => _viewExpenseDetails(expense),
+              leading: CircleAvatar(
+                backgroundColor: Theme.of(context).primaryColor,
+                child: Text(
+                  expense.category[0].toUpperCase(),
+                  style: const TextStyle(color: Colors.white),
+                ),
               ),
-            ),
-            title: Text(
-              expense.description,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(
-              DateFormat('MMM dd, yyyy').format(expense.date),
-            ),
-            trailing: Text(
-              '${expense.currency} ${expense.amount.toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+              title: Text(
+                expense.description,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                DateFormat('MMM dd, yyyy').format(expense.date),
+              ),
+              trailing: Text(
+                '${expense.currency} ${expense.amount.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
             ),
           ),
@@ -206,173 +228,16 @@ class _ExpenseViewScreenState extends State<ExpenseViewScreen> {
   }
 }
 
-// class ExpenseDetailScreen extends StatelessWidget {
-//   final ExpenseModel expense;
-
-//   const ExpenseDetailScreen({super.key, required this.expense});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: const Text('Expense Details'),
-//         actions: [
-//           IconButton(
-//             icon: const Icon(Icons.edit),
-//             onPressed: () {
-//               Navigator.push(
-//                 context,
-//                 MaterialPageRoute(
-//                   builder: (context) => ExpenseEditScreen(expense: expense),
-//                 ),
-//               ).then((updated) {
-//                 if (updated == true) {
-//                   ExpenseViewScreen._refreshExpenses();
-//                 }
-//               });
-
-//             },
-//           ),
-//         ],
-//       ),
-//       body: SingleChildScrollView(
-//         child: Column(
-//           crossAxisAlignment: CrossAxisAlignment.stretch,
-//           children: [
-//             if (expense.imagePath != null)
-//               Container(
-//                 height: 200,
-//                 width: double.infinity,
-//                 decoration: BoxDecoration(
-//                   color: Colors.grey[200],
-//                 ),
-//                 child: Image.network(
-//                   expense.imagePath!,
-//                   fit: BoxFit.cover,
-//                 ),
-//               ),
-//             Container(
-//               color: Theme.of(context).colorScheme.surface,
-//               padding: const EdgeInsets.all(16),
-//               child: Column(
-//                 crossAxisAlignment: CrossAxisAlignment.start,
-//                 children: [
-//                   _buildAmountSection(context),
-//                   const SizedBox(height: 24),
-//                   _buildDetailsSection(context),
-//                 ],
-//               ),
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-
-//   Widget _buildAmountSection(BuildContext context) {
-//     return Container(
-//       width: double.infinity,
-//       padding: const EdgeInsets.all(20),
-//       decoration: BoxDecoration(
-//         color: Theme.of(context).primaryColor,
-//         borderRadius: BorderRadius.circular(12),
-//       ),
-//       child: Column(
-//         children: [
-//           Text(
-//             '${expense.currency} ${expense.amount.toStringAsFixed(2)}',
-//             style: TextStyle(
-//               fontSize: 32,
-//               fontWeight: FontWeight.bold,
-//               //color: Theme.of(context).primaryColor,
-//             ),
-//           ),
-//           const SizedBox(height: 8),
-//           Text(
-//             DateFormat('MMMM dd, yyyy').format(expense.date),
-//             style: TextStyle(
-//               fontSize: 16,
-//               color: Colors.grey[600],
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-
-//   Widget _buildDetailsSection(BuildContext context) {
-//     return Column(
-//       crossAxisAlignment: CrossAxisAlignment.start,
-//       children: [
-//         _buildDetailItem(
-//           context,
-//           icon: Icons.description,
-//           label: 'Description',
-//           value: expense.description,
-//         ),
-//         const SizedBox(height: 16),
-//         _buildDetailItem(
-//           context,
-//           icon: Icons.category,
-//           label: 'Category',
-//           value: expense.category,
-//         ),
-//       ],
-//     );
-//   }
-
-//   Widget _buildDetailItem(
-//     BuildContext context, {
-//     required IconData icon,
-//     required String label,
-//     required String value,
-//   }) {
-//     return Container(
-//       width: double.infinity,
-//       padding: const EdgeInsets.all(16),
-//       decoration: BoxDecoration(
-//         border: Border.all(color: Colors.grey[300]!),
-//         borderRadius: BorderRadius.circular(12),
-//       ),
-//       child: Column(
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           Row(
-//             children: [
-//               Icon(icon, size: 20, color: Colors.grey[600]),
-//               const SizedBox(width: 8),
-//               Text(
-//                 label,
-//                 style: TextStyle(
-//                   fontSize: 14,
-//                   color: Colors.grey[600],
-//                 ),
-//               ),
-//             ],
-//           ),
-//           const SizedBox(height: 8),
-//           Text(
-//             value,
-//             style: const TextStyle(
-//               fontSize: 16,
-//               fontWeight: FontWeight.w500,
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
-
 class ExpenseDetailScreen extends StatelessWidget {
   final ExpenseModel expense;
-  final VoidCallback
-      onExpenseUpdated; // Callback function for refreshing expenses
+  final VoidCallback onExpenseUpdated;
+  final VoidCallback onExpenseDeleted;
 
   const ExpenseDetailScreen({
     super.key,
     required this.expense,
     required this.onExpenseUpdated,
+    required this.onExpenseDeleted,
   });
 
   @override
@@ -391,9 +256,37 @@ class ExpenseDetailScreen extends StatelessWidget {
                 ),
               ).then((updated) {
                 if (updated == true) {
-                  onExpenseUpdated(); // Trigger the callback to refresh the expense list
+                  onExpenseUpdated();
                 }
               });
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Delete Expense'),
+                  content: const Text(
+                      'Are you sure you want to delete this expense?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context); // Close dialog
+                        onExpenseDeleted();
+                        Navigator.pop(context); // Return to list
+                      },
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
+                      child: const Text('Delete'),
+                    ),
+                  ],
+                ),
+              );
             },
           ),
         ],
@@ -402,16 +295,36 @@ class ExpenseDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (expense.imagePath != null)
+            if (expense.imagePath != null) // Only show if image path exists
               Container(
                 height: 200,
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: Colors.grey[200],
                 ),
-                child: Image.network(
-                  expense.imagePath!,
-                  fit: BoxFit.cover,
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            ImageDetailsScreen(expense: expense),
+                      ),
+                    );
+                  },
+                  child: Center(
+                    child: FadeInImage.memoryNetwork(
+                      placeholder: kTransparentImage,
+                      image: expense.imagePath!,
+                      fit: BoxFit.cover,
+                      imageErrorBuilder: (context, error, stackTrace) {
+                        return const Center(
+                          child:
+                              Icon(Icons.error, size: 40, color: Colors.grey),
+                        );
+                      },
+                    ),
+                  ),
                 ),
               ),
             Container(
@@ -521,6 +434,30 @@ class ExpenseDetailScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class ImageDetailsScreen extends StatelessWidget {
+  final ExpenseModel expense;
+
+  const ImageDetailsScreen({super.key, required this.expense});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Expense Image'),
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          child: FadeInImage.memoryNetwork(
+            placeholder: kTransparentImage,
+            image: expense.imagePath!,
+            fit: BoxFit.contain,
+          ),
+        ),
       ),
     );
   }

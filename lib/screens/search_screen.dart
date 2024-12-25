@@ -1,4 +1,4 @@
-import 'package:finance_tracker/models/expense_model.dart';
+import 'package:finance_tracker/utils/expense_service.dart';
 import 'package:finance_tracker/screens/expense_card.dart';
 import 'package:finance_tracker/utils/firebase_service.dart';
 import 'package:finance_tracker/utils/general_utilities.dart';
@@ -14,10 +14,10 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final FirebaseService _firebaseService = FirebaseService();
   final _searchController = TextEditingController();
-  RangeValues _amountRange = RangeValues(0, 1000);
+  RangeValues _amountRange = RangeValues(0, 1000000);
   DateTimeRange? _dateRange;
   String? _selectedCategory;
-  String? _selectedCurrency;
+  String? _selectedCurrency = 'INR';
   List<ExpenseModel> _expenses = [];
   bool _isLoading = false;
   bool _hasActiveFilters = false;
@@ -50,16 +50,16 @@ class _SearchScreenState extends State<SearchScreen> {
       _hasActiveFilters = _selectedCategory != null ||
           _selectedCurrency != null ||
           _dateRange != null ||
-          _amountRange != const RangeValues(0, 1000);
+          _amountRange != const RangeValues(0, 1000000);
     });
   }
 
   void _clearFilters() {
     setState(() {
       _selectedCategory = null;
-      _selectedCurrency = null;
+      _selectedCurrency = 'INR';
       _dateRange = null;
-      _amountRange = const RangeValues(0, 1000);
+      _amountRange = const RangeValues(0, 1000000);
       _hasActiveFilters = false;
       if (_searchController.text.isEmpty) {
         _expenses = [];
@@ -96,10 +96,14 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
         actions: [
           if (_hasActiveFilters)
-            IconButton(
-              icon: const Icon(Icons.clear_all),
+            // IconButton(
+            //   icon: const Icon(Icons.clear_all),
+            //   onPressed: _clearFilters,
+            //   tooltip: 'Clear all filters',
+            // ),
+            ElevatedButton(
               onPressed: _clearFilters,
-              tooltip: 'Clear all filters',
+              child: Text('Clear Filters'),
             ),
         ],
       ),
@@ -180,21 +184,44 @@ class _SearchScreenState extends State<SearchScreen> {
                         });
                       },
                     ),
-                    RangeSlider(
-                      values: _amountRange,
-                      min: 0,
-                      max: 1000,
-                      divisions: 20,
-                      labels: RangeLabels(
-                        _amountRange.start.toString(),
-                        _amountRange.end.toString(),
-                      ),
-                      onChanged: (RangeValues values) {
-                        setState(() {
-                          _amountRange = values;
-                          _updateSearch();
-                        });
-                      },
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            decoration: const InputDecoration(
+                              labelText: 'Min Amount',
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: (value) {
+                              double minAmount = double.tryParse(value) ?? 0;
+                              setState(() {
+                                _amountRange =
+                                    RangeValues(minAmount, _amountRange.end);
+                                _updateSearch();
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: TextFormField(
+                            decoration: const InputDecoration(
+                              labelText: 'Max Amount',
+                              border: OutlineInputBorder(),
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: (value) {
+                              double maxAmount = double.tryParse(value) ?? 0;
+                              setState(() {
+                                _amountRange =
+                                    RangeValues(_amountRange.start, maxAmount);
+                                _updateSearch();
+                              });
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                     ElevatedButton(
                       onPressed: () async {
@@ -237,25 +264,6 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // void _updateSearch([String? query]) async {
-  //   setState(() {
-  //     _isLoading = true; // Set loading state to true before fetching data
-  //   });
-
-  //   final expenses = await _firebaseService.searchExpenses(
-  //     query: _searchController.text,
-  //     category: _selectedCategory,
-  //     currency: _selectedCurrency,
-  //     minAmount: _amountRange.start,
-  //     maxAmount: _amountRange.end,
-  //     dateRange: _dateRange,
-  //   );
-
-  //   setState(() {
-  //     _expenses = expenses;
-  //     _isLoading = false; // Set loading state to false after data is fetched
-  //   });
-  // }
   void _updateSearch() async {
     if (!mounted) return;
 
