@@ -1,5 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:finance_tracker/screens/login_screen.dart';
 import 'package:finance_tracker/utils/general_utilities.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -453,6 +455,22 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 }
 
+String formatCurrency(double amount) {
+  String? currencySymbol;
+
+  // Get the user's default currency from Firestore
+  FirebaseFirestore.instance
+      .collection('users')
+      .doc(FirebaseAuth.instance.currentUser!.uid)
+      .get()
+      .then((DocumentSnapshot doc) {
+    currencySymbol = doc.get('defaultCurrency') as String?;
+  });
+
+  // Use the retrieved currency symbol for formatting
+  return NumberFormat.currency(symbol: currencySymbol ?? '₹').format(amount);
+}
+
 class _StatCard extends StatelessWidget {
   final String title;
   final double amount;
@@ -482,7 +500,7 @@ class _StatCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              NumberFormat.currency(symbol: '\$').format(amount),
+              formatCurrency(amount),
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: color,
                     fontWeight: FontWeight.bold,

@@ -5,8 +5,10 @@ import 'package:finance_tracker/models/budget_model.dart';
 import 'package:finance_tracker/models/expense_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+// import 'dart:typed_data';
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -25,26 +27,57 @@ class FirebaseService {
     required String name,
     String? profileImagePath,
   }) async {
-    UserCredential credential = await _auth.createUserWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
+    try {
+      // 1. First create the user account
+      UserCredential credential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-    String? imageUrl;
-    if (profileImagePath != null) {
-      imageUrl = await _uploadProfileImage(
-          File(profileImagePath), credential.user!.uid);
+      String? imageUrl;
+
+      // 2. If there's a profile image, upload it
+      if (profileImagePath != null) {
+        final String fileName =
+            'profile_${credential.user!.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final Reference storageRef =
+            _storage.ref().child('profile_images/$fileName');
+
+        UploadTask uploadTask;
+
+        if (kIsWeb) {
+          // For web platform
+          final XFile imageFile = XFile(profileImagePath);
+          final Uint8List imageBytes = await imageFile.readAsBytes();
+          uploadTask = storageRef.putData(
+            imageBytes,
+            SettableMetadata(contentType: 'image/jpeg'),
+          );
+        } else {
+          // For mobile platforms
+          final File imageFile = File(profileImagePath);
+          uploadTask = storageRef.putFile(imageFile);
+        }
+
+        // Wait for upload to complete and get URL
+        final TaskSnapshot taskSnapshot = await uploadTask;
+        imageUrl = await taskSnapshot.ref.getDownloadURL();
+      }
+
+      // 3. Create the user profile in Firestore
+      await _firestore.collection('users').doc(credential.user!.uid).set({
+        'name': name,
+        'email': email,
+        'profileImage': imageUrl,
+        'defaultCurrency': 'USD',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      return credential;
+    } catch (e) {
+      print('Error during registration: $e');
+      rethrow;
     }
-
-    await _firestore.collection('users').doc(credential.user!.uid).set({
-      'name': name,
-      'email': email,
-      'profileImage': imageUrl,
-      'defaultCurrency': 'INR',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    return credential;
   }
 
   Future<void> signOut() async {
@@ -68,34 +101,95 @@ class FirebaseService {
     await _firestore.collection('users').doc(userId).update(data);
   }
 
+  // Future<String?> updateProfileImage() async {
+  //   String? userId = _auth.currentUser?.uid;
+  //   if (userId == null) throw Exception('User not authenticated');
+
+  //   final ImagePicker picker = ImagePicker();
+  //   final XFile? image = await picker.pickImage(
+  //     source: ImageSource.gallery,
+  //     maxWidth: 1024,
+  //     maxHeight: 1024,
+  //     imageQuality: 85,
+  //   );
+
+  //   if (image == null) return null;
+
+  //   return await _uploadProfileImage(File(image.path), userId);
+  // }
+
+  // Future<String> _uploadProfileImage(File imageFile, String userId) async {
+  //   String fileName = 'profile_$userId.jpg';
+  //   Reference ref = _storage.ref().child('profile_images/$fileName');
+
+  //   try {
+  //     await ref.delete();
+  //   } catch (_) {}
+
+  //   await ref.putFile(imageFile);
+  //   return await ref.getDownloadURL();
+  // }
   Future<String?> updateProfileImage() async {
-    String? userId = _auth.currentUser?.uid;
-    if (userId == null) throw Exception('User not authenticated');
-
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1024,
-      maxHeight: 1024,
-      imageQuality: 85,
-    );
-
-    if (image == null) return null;
-
-    return await _uploadProfileImage(File(image.path), userId);
-  }
-
-  Future<String> _uploadProfileImage(File imageFile, String userId) async {
-    String fileName = 'profile_$userId.jpg';
-    Reference ref = _storage.ref().child('profile_images/$fileName');
-
     try {
-      await ref.delete();
-    } catch (_) {}
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
 
-    await ref.putFile(imageFile);
-    return await ref.getDownloadURL();
+      if (image == null) return null;
+
+      final String userId = _auth.currentUser?.uid ?? '';
+      if (userId.isEmpty) throw Exception('User not authenticated');
+
+      // Generate a unique filename
+      final String fileName =
+          'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final Reference storageRef =
+          _storage.ref().child('profile_images/$fileName');
+
+      UploadTask uploadTask;
+
+      if (kIsWeb) {
+        // Handle web platform
+        final Uint8List imageBytes = await image.readAsBytes();
+        uploadTask = storageRef.putData(
+          imageBytes,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+      } else {
+        // Handle mobile platforms
+        final File imageFile = File(image.path);
+        uploadTask = storageRef.putData(
+          await imageFile.readAsBytes(),
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+      }
+
+      // Wait for the upload to complete
+      final TaskSnapshot taskSnapshot = await uploadTask;
+
+      // Get the download URL
+      final String downloadUrl = await taskSnapshot.ref.getDownloadURL();
+
+      // Update user profile with new image URL
+      await updateUserProfile({'profileImage': downloadUrl});
+
+      return downloadUrl;
+    } catch (e) {
+      print('Error uploading profile image: $e');
+      rethrow;
+    }
   }
+
+  // Future<void> updateUserProfile(Map<String, dynamic> data) async {
+  //   String? userId = _auth.currentUser?.uid;
+  //   if (userId == null) throw Exception('User not authenticated');
+
+  //   await _firestore.collection('users').doc(userId).update(data);
+  // }
 
   // Expense methods
   Future<void> addExpense(ExpenseModel expense) async {
