@@ -306,49 +306,68 @@ class FirebaseService {
     DateTimeRange? dateRange,
   }) async {
     try {
+      String? userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) throw Exception('User not authenticated');
+
+      // Start with the base query
       Query<Map<String, dynamic>> queryRef = _firestore
           .collection('users')
-          .doc(FirebaseAuth.instance.currentUser!.uid)
-          .collection('expenses');
+          .doc(userId)
+          .collection('expenses')
+          .orderBy('date', descending: true);
 
-      if (query != null && query.isNotEmpty) {
-        query = query.toLowerCase(); // Normalize the query
-        queryRef = queryRef
-            .orderBy('description')
-            .where('description', isGreaterThanOrEqualTo: query)
-            .where('description', isLessThanOrEqualTo: '$query\uf8ff');
-      }
-
-      if (category != null && category.isNotEmpty) {
-        queryRef = queryRef.where('category', isEqualTo: category);
-      }
-      if (currency != null && currency.isNotEmpty) {
-        queryRef = queryRef.where('currency', isEqualTo: currency);
-      }
-      if (minAmount != null) {
-        queryRef = queryRef.where('amount', isGreaterThanOrEqualTo: minAmount);
-      }
-      if (maxAmount != null) {
-        queryRef = queryRef.where('amount', isLessThanOrEqualTo: maxAmount);
-      }
+      // Apply date range filter if provided
       if (dateRange != null) {
         queryRef = queryRef
             .where('date',
-                isGreaterThanOrEqualTo: Timestamp.fromDate(dateRange.start))
+                isGreaterThanOrEqualTo: dateRange.start.toIso8601String())
             .where('date',
-                isLessThanOrEqualTo: Timestamp.fromDate(dateRange.end));
+                isLessThanOrEqualTo: dateRange.end.toIso8601String());
       }
 
-      // Fetch data from Firestore
-      final snapshot = await queryRef.get();
+      // Execute the query
+      final QuerySnapshot<Map<String, dynamic>> snapshot = await queryRef.get();
 
-      final expenses =
+      // Convert to list of ExpenseModel
+      List<ExpenseModel> expenses =
           snapshot.docs.map((doc) => ExpenseModel.fromFirestore(doc)).toList();
 
-      return expenses;
+      // Apply remaining filters in memory
+      return expenses.where((expense) {
+        // Text search in description
+        bool matchesSearch = true;
+        if (query != null && query.isNotEmpty) {
+          matchesSearch =
+              expense.description.toLowerCase().contains(query.toLowerCase());
+        }
+
+        // Category filter
+        bool matchesCategory = true;
+        if (category != null && category.isNotEmpty) {
+          matchesCategory = expense.category == category;
+        }
+
+        // Currency filter
+        bool matchesCurrency = true;
+        if (currency != null && currency.isNotEmpty) {
+          matchesCurrency = expense.currency == currency;
+        }
+
+        // Amount range filter
+        bool matchesAmount = true;
+        if (minAmount != null && maxAmount != null) {
+          matchesAmount =
+              expense.amount >= minAmount && expense.amount <= maxAmount;
+        }
+
+        return matchesSearch &&
+            matchesCategory &&
+            matchesCurrency &&
+            matchesAmount;
+      }).toList();
     } catch (e) {
-      // print('Error fetching expenses: $e');
-      return [];
+      debugPrint('Error searching expenses: $e');
+      rethrow;
     }
   }
 

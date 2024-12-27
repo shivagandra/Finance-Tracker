@@ -30,52 +30,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   bool _isLoading = false; // Added loading state
   String? _imageUrl;
 
-  // Future<void> _saveExpense() async {
-  //   if (_descriptionController.text.isEmpty ||
-  //       _amountController.text.isEmpty ||
-  //       _selectedCategory == null ||
-  //       _selectedCurrency == null) {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       const SnackBar(content: Text('Please fill out all fields')),
-  //     );
-  //     return;
-  //   }
-
-  //   ExpenseModel expense = ExpenseModel(
-  //     id: '',
-  //     amount: double.parse(_amountController.text),
-  //     category: _selectedCategory!,
-  //     description: _descriptionController.text,
-  //     date: DateTime.now(),
-  //     imagePath: _imageUrl,
-  //     currency: _selectedCurrency!,
-  //   );
-
-  //   setState(() {
-  //     _isLoading = true;
-  //   });
-
-  //   try {
-  //     await _firestore
-  //         .collection('users')
-  //         .doc(FirebaseAuth.instance.currentUser!.uid)
-  //         .collection('expenses')
-  //         .add(expense.toMap());
-
-  //     setState(() {
-  //       _isLoading = false;
-  //     });
-
-  //     Navigator.pop(context);
-  //   } catch (e) {
-  //     setState(() {
-  //       _isLoading = false;
-  //     });
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(content: Text('Error saving expense: $e')),
-  //     );
-  //   }
-  // }
   Future<void> _saveExpense() async {
     if (_descriptionController.text.isEmpty ||
         _amountController.text.isEmpty ||
