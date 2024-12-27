@@ -1,7 +1,7 @@
-// import 'package:finance_tracker/screens/expenses_list_screen.dart';
 import 'package:finance_tracker/screens/expenses_view_screen.dart';
 import 'package:finance_tracker/screens/profile_screen.dart';
 import 'package:finance_tracker/screens/search_screen.dart';
+import 'package:finance_tracker/screens/spend_analysis_screen.dart';
 import 'package:finance_tracker/utils/general_utilities.dart';
 import 'package:flutter/material.dart';
 
@@ -16,6 +16,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = [
     ExpenseViewScreen(),
     SearchScreen(),
+    SpendAnalysisScreen(),
     ProfilePage(),
   ];
 
@@ -52,17 +53,27 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
-        items: const [
+        type: BottomNavigationBarType
+            .fixed, // Use fixed type for consistent icon colors
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
+            icon: Icon(Icons.home,
+                color: _selectedIndex == 0 ? Colors.purple : Colors.black),
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.search),
+            icon: Icon(Icons.search,
+                color: _selectedIndex == 1 ? Colors.purple : Colors.black),
             label: 'Search',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person),
+            icon: Icon(Icons.insights,
+                color: _selectedIndex == 2 ? Colors.purple : Colors.black),
+            label: 'Spend Analysis',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person,
+                color: _selectedIndex == 3 ? Colors.purple : Colors.black),
             label: 'Profile',
           ),
         ],

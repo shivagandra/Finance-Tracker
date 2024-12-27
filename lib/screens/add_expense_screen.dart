@@ -1,13 +1,8 @@
 import 'dart:io';
-// import 'dart:typed_data';
-
-// import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-
 import 'package:finance_tracker/utils/expense_service.dart';
 import 'package:finance_tracker/utils/firebase_service.dart';
 
@@ -22,12 +17,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   String? _selectedCategory;
-  String? _selectedCurrency = 'INR'; // Default to INR, you can expand this
+  String? _selectedCurrency = 'INR';
   XFile? _selectedImage;
   final FirebaseService _firebaseService = FirebaseService();
-  // final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
-  bool _isLoading = false; // Added loading state
+  bool _isLoading = false;
   String? _imageUrl;
 
   Future<void> _saveExpense() async {
@@ -41,9 +35,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       return;
     }
 
-    // Assign placeholder if no image is selected
-    final imagePath = _imageUrl ??
-        'https://via.placeholder.com/150'; // Replace with your placeholder URL.
+    // Use default asset image path if no image is selected
+    final imagePath = _imageUrl ?? 'assets/images/demo_bill.jpg';
 
     ExpenseModel expense = ExpenseModel(
       id: '',
@@ -106,6 +99,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
           await uploadTask;
           _imageUrl = await ref.getDownloadURL();
         }
+
+        setState(() {}); // Refresh UI with new image
       }
     } catch (e) {
       if (kDebugMode) {
@@ -117,37 +112,112 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     }
   }
 
+  Widget _buildImageSection() {
+    return Column(
+      children: [
+        Container(
+          height: 150,
+          width: 150,
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: _selectedImage != null
+              ? kIsWeb
+                  ? FutureBuilder<Uint8List>(
+                      future: _selectedImage!.readAsBytes(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.done) {
+                          return Image.memory(
+                            snapshot.data!,
+                            fit: BoxFit.cover,
+                          );
+                        }
+                        return const CircularProgressIndicator();
+                      },
+                    )
+                  : Image.file(
+                      File(_selectedImage!.path),
+                      fit: BoxFit.cover,
+                    )
+              : _imageUrl != null
+                  ? Image.network(
+                      _imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Image(
+                          image: AssetImage('assets/images/demo_bill.jpg'),
+                          fit: BoxFit.cover,
+                        );
+                      },
+                    )
+                  : Image(
+                      image: AssetImage('assets/images/demo_bill.jpg'),
+                      fit: BoxFit.cover,
+                    ),
+        ),
+        const SizedBox(height: 16),
+        ElevatedButton.icon(
+          onPressed: _pickImage,
+          icon: const Icon(Icons.photo_camera),
+          label: Text(_selectedImage == null ? 'Pick Image' : 'Change Image'),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Expense')),
-      body: Padding(
+      appBar: AppBar(
+        title: const Text('Add Expense'),
+        actions: [
+          if (!_isLoading)
+            IconButton(
+              icon: const Icon(Icons.save),
+              onPressed: _saveExpense,
+            ),
+        ],
+      ),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             TextField(
               controller: _descriptionController,
-              decoration: const InputDecoration(labelText: 'Description'),
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                border: OutlineInputBorder(),
+              ),
             ),
+            const SizedBox(height: 16),
             TextField(
               controller: _amountController,
-              decoration: const InputDecoration(labelText: 'Amount'),
+              decoration: const InputDecoration(
+                labelText: 'Amount',
+                border: OutlineInputBorder(),
+              ),
               keyboardType: TextInputType.number,
             ),
+            const SizedBox(height: 16),
             StreamBuilder<List<String>>(
               stream: _firebaseService.getCategories(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const CircularProgressIndicator(); // While loading
+                  return const CircularProgressIndicator();
                 } else if (snapshot.hasError) {
-                  return Text('Error: ${snapshot.error}'); // If error occurs
+                  return Text('Error: ${snapshot.error}');
                 } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Text('No categories available'); // When no data
+                  return const Text('No categories available');
                 }
 
-                return DropdownButton<String>(
+                return DropdownButtonFormField<String>(
                   value: _selectedCategory,
-                  hint: const Text('Select Category'),
+                  decoration: const InputDecoration(
+                    labelText: 'Category',
+                    border: OutlineInputBorder(),
+                  ),
                   items: snapshot.data!.map((category) {
                     return DropdownMenuItem(
                       value: category,
@@ -163,57 +233,57 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               },
             ),
             const SizedBox(height: 16),
-            DropdownButton<String>(
+            DropdownButtonFormField<String>(
               value: _selectedCurrency,
+              decoration: const InputDecoration(
+                labelText: 'Currency',
+                border: OutlineInputBorder(),
+              ),
+              items: ['USD', 'EUR', 'INR', 'GBP'].map((currency) {
+                return DropdownMenuItem(
+                  value: currency,
+                  child: Text(currency),
+                );
+              }).toList(),
               onChanged: (value) {
                 setState(() {
                   _selectedCurrency = value;
                 });
               },
-              items: ['USD', 'EUR', 'INR', 'GBP'].map((currency) {
-                return DropdownMenuItem<String>(
-                  value: currency,
-                  child: Text(currency),
-                );
-              }).toList(),
-              hint: const Text('Select Currency'),
             ),
-            const SizedBox(height: 16),
-            _selectedImage == null
-                ? ElevatedButton(
-                    onPressed: _pickImage,
-                    child: const Text('Pick Image'),
-                  )
-                : kIsWeb
-                    ? FutureBuilder<Uint8List>(
-                        future: _selectedImage!.readAsBytes(),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.done) {
-                            return Image.memory(
-                              snapshot.data!,
-                              height: 150,
-                              width: 150,
-                              fit: BoxFit.cover,
-                            );
-                          } else {
-                            return const CircularProgressIndicator();
-                          }
-                        },
-                      )
-                    : Image.file(
-                        File(_selectedImage!.path),
-                        height: 150,
-                        width: 150,
-                        fit: BoxFit.cover,
-                      ),
-            const SizedBox(height: 16),
-            _isLoading
-                ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    onPressed: _saveExpense,
-                    child: const Text('Save Expense'),
+            const SizedBox(height: 24),
+            _buildImageSection(),
+            const SizedBox(height: 24),
+            if (_isLoading)
+              const Center(child: CircularProgressIndicator())
+            else
+
+              // ElevatedButton.icon(
+              //   onPressed: _saveExpense,
+              //   icon: const Icon(Icons.save),
+              //   label: const Text('Save Expense'),
+              //   style: ElevatedButton.styleFrom(
+              //     padding: const EdgeInsets.symmetric(vertical: 12),
+              //   ),
+              // ),
+              SizedBox(
+                width: MediaQuery.of(context).size.width * 0.4,
+                child: ElevatedButton.icon(
+                  onPressed: _saveExpense,
+                  icon: const Icon(Icons.save),
+                  label: const Text(
+                    'Save Expense',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

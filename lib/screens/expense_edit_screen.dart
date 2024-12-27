@@ -87,86 +87,6 @@ class _ExpenseEditScreenState extends State<ExpenseEditScreen> {
     }
   }
 
-  // Future<void> _updateExpense() async {
-  //   if (_descriptionController.text.isEmpty ||
-  //       _amountController.text.isEmpty ||
-  //       _selectedCategory == null ||
-  //       _selectedCurrency == null) {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       const SnackBar(content: Text('Please fill out all required fields')),
-  //     );
-  //     return;
-  //   }
-
-  //   setState(() {
-  //     _isLoading = true;
-  //   });
-
-  //   try {
-  //     // First verify the expense still exists
-  //     final expenseExists =
-  //         await _firebaseService.checkExpenseExists(widget.expense.id);
-  //     if (!expenseExists) {
-  //       throw Exception('Expense no longer exists');
-  //     }
-
-  //     // Create updated expense model
-  //     ExpenseModel updatedExpense = ExpenseModel(
-  //       id: widget.expense.id,
-  //       description: _descriptionController.text,
-  //       amount: double.parse(_amountController.text),
-  //       category: _selectedCategory!,
-  //       currency: _selectedCurrency!,
-  //       date: _selectedDate,
-  //       imagePath: _imageUrl,
-  //     );
-
-  //     // Update expense in Firebase
-  //     await _firebaseService.updateExpense(updatedExpense);
-
-  //     if (mounted) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(
-  //           content: Text('Expense updated successfully'),
-  //           backgroundColor: Colors.green,
-  //         ),
-  //       );
-  //       Navigator.pop(context, true);
-  //     }
-  //   } catch (e) {
-  //     if (mounted) {
-  //       String errorMessage;
-
-  //       if (e.toString().contains('no longer exists') ||
-  //           e.toString().contains('not found')) {
-  //         errorMessage =
-  //             'This expense has been deleted or no longer exists. Please go back and refresh your expense list.';
-  //       } else {
-  //         errorMessage = 'Error updating expense: ${e.toString()}';
-  //       }
-
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         SnackBar(
-  //           content: Text(errorMessage),
-  //           backgroundColor: Colors.red,
-  //           duration: const Duration(seconds: 4),
-  //           action: SnackBarAction(
-  //             label: 'OK',
-  //             onPressed: () {
-  //               Navigator.pop(context); // Return to previous screen
-  //             },
-  //           ),
-  //         ),
-  //       );
-  //     }
-  //   } finally {
-  //     if (mounted) {
-  //       setState(() {
-  //         _isLoading = false;
-  //       });
-  //     }
-  //   }
-  // }
   Future<void> _updateExpense() async {
     if (_descriptionController.text.isEmpty ||
         _amountController.text.isEmpty ||
@@ -347,6 +267,52 @@ class _ExpenseEditScreenState extends State<ExpenseEditScreen> {
                   ),
                   const SizedBox(height: 16),
                   // Add the conditional rendering for placeholder and image
+                  // Center(
+                  //   child: Column(
+                  //     children: [
+                  //       if (_imageUrl != null || _selectedImage != null)
+                  //         Container(
+                  //           width: 200,
+                  //           height: 200,
+                  //           decoration: BoxDecoration(
+                  //             border: Border.all(color: Colors.grey),
+                  //             borderRadius: BorderRadius.circular(8),
+                  //           ),
+                  //           child: _selectedImage != null
+                  //               ? kIsWeb
+                  //                   ? FutureBuilder<Uint8List>(
+                  //                       future: _selectedImage!.readAsBytes(),
+                  //                       builder: (context, snapshot) {
+                  //                         if (snapshot.hasData) {
+                  //                           return Image.memory(
+                  //                             snapshot.data!,
+                  //                             fit: BoxFit.cover,
+                  //                           );
+                  //                         }
+                  //                         return const CircularProgressIndicator();
+                  //                       },
+                  //                     )
+                  //                   : Image.file(
+                  //                       File(_selectedImage!.path),
+                  //                       fit: BoxFit.cover,
+                  //                     )
+                  //               : Image.network(
+                  //                   _imageUrl ??
+                  //                       'https://via.placeholder.com/150',
+                  //                   fit: BoxFit.cover,
+                  //                 ),
+                  //         ),
+                  //       const SizedBox(height: 8),
+                  //       ElevatedButton.icon(
+                  //         onPressed: _pickImage,
+                  //         icon: const Icon(Icons.photo_camera),
+                  //         label: Text(
+                  //           _imageUrl == null ? 'Add Image' : 'Change Image',
+                  //         ),
+                  //       ),
+                  //     ],
+                  //   ),
+                  // ),
                   Center(
                     child: Column(
                       children: [
@@ -376,11 +342,24 @@ class _ExpenseEditScreenState extends State<ExpenseEditScreen> {
                                         File(_selectedImage!.path),
                                         fit: BoxFit.cover,
                                       )
-                                : Image.network(
-                                    _imageUrl ??
-                                        'https://via.placeholder.com/150',
-                                    fit: BoxFit.cover,
-                                  ),
+                                : _imageUrl != null
+                                    ? Image.network(
+                                        _imageUrl!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) {
+                                          return Image(
+                                            image: AssetImage(
+                                                'assets/images/demo_bill.jpg'),
+                                            fit: BoxFit.cover,
+                                          );
+                                        },
+                                      )
+                                    : Image(
+                                        image: AssetImage(
+                                            'assets/images/demo_bill.jpg'),
+                                        fit: BoxFit.cover,
+                                      ),
                           ),
                         const SizedBox(height: 8),
                         ElevatedButton.icon(
@@ -392,7 +371,7 @@ class _ExpenseEditScreenState extends State<ExpenseEditScreen> {
                         ),
                       ],
                     ),
-                  ),
+                  )
                 ],
               ),
             ),

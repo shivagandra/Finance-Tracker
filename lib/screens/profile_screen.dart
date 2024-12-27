@@ -1,9 +1,12 @@
+import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+// import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-// import 'package:cached_network_image/cached_network_image.dart';
-import 'package:intl/intl.dart';
-import 'package:finance_tracker/screens/login_screen.dart';
+// import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:finance_tracker/utils/firebase_service.dart';
-import 'package:finance_tracker/utils/general_utilities.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -13,49 +16,65 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  Map<String, String> currencySymbols = {
+    'USD': '\$', // US Dollar
+    'INR': '₹', // Indian Rupee
+    'EUR': '€', // Euro
+    'GBP': '£', // British Pound
+    'AUD': '\$', // Australian Dollar (same as USD)
+    'JPY': '¥', // Japanese Yen
+    // Add more as needed
+  };
+
+  Future<String> getUserCurrencyFormatter() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    DocumentSnapshot userDoc =
+        await FirebaseFirestore.instance.collection('users').doc(userId).get();
+
+    if (userDoc.exists) {
+      String currencyCode = userDoc['defaultCurrency'] ?? 'INR';
+      String currencySymbol = currencySymbols[currencyCode] ?? '₹';
+      return currencySymbol;
+    } else {
+      return '₹';
+    }
+  }
+
   final FirebaseService _firebaseService = FirebaseService();
-  final currencyFormatter = NumberFormat.currency(symbol: '\$');
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _budgetController = TextEditingController();
+
   bool _isLoading = true;
+  bool _isEditing = false;
   Map<String, dynamic>? _userProfile;
   double _monthlyBudget = 0.0;
   double _monthlySpending = 0.0;
+  late String _currencySymbol = '₹'; // Default to INR
+  String? _selectedCurrency;
 
   @override
   void initState() {
     super.initState();
     _loadProfileData();
+    _getCurrencySymbol();
   }
 
-  // Future<void> _loadProfileData() async {
-  //   try {
-  //     final profile = await _firebaseService.getUserProfile();
-  //     final budgets = await _firebaseService.getBudgets().first;
-  //     final monthStart = DateTime(DateTime.now().year, DateTime.now().month, 1);
-  //     final monthEnd =
-  //         DateTime(DateTime.now().year, DateTime.now().month + 1, 0);
+  Future<void> _getCurrencySymbol() async {
+    String symbol = await getUserCurrencyFormatter();
+    setState(() {
+      _currencySymbol = symbol;
+      _isLoading = false; // Once the data is fetched, stop loading
+    });
+  }
 
-  //     final expenses = await _firebaseService.searchExpensesProfileScreen(
-  //       dateRange: DateTimeRange(start: monthStart, end: monthEnd),
-  //     );
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _budgetController.dispose();
+    super.dispose();
+  }
 
-  //     if (mounted) {
-  //       setState(() {
-  //         _userProfile = profile;
-  //         _monthlyBudget = budgets.fold(
-  //             0.0, (sum, budget) => sum + (budget.amount as num).toDouble());
-  //         _monthlySpending = expenses.fold(
-  //             0.0, (sum, expense) => sum + (expense.amount as num).toDouble());
-  //         _isLoading = false;
-  //       });
-  //     }
-  //   } catch (e) {
-  //     if (mounted) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         SnackBar(content: Text('Error loading profile: $e')),
-  //       );
-  //     }
-  //   }
-  // }
   Future<void> _loadProfileData() async {
     try {
       final profile = await _firebaseService.getUserProfile();
@@ -71,18 +90,13 @@ class _ProfilePageState extends State<ProfilePage> {
       if (mounted) {
         setState(() {
           _userProfile = profile;
-
-          // Explicitly handle `amount` as a double
           _monthlyBudget = budgets.fold(
-            0.0,
-            (sum, budget) => sum + ((budget.amount as num).toDouble()),
-          );
-
+              0.0, (sum, budget) => sum + (budget.amount as num).toDouble());
           _monthlySpending = expenses.fold(
-            0.0,
-            (sum, expense) => sum + (expense.amount as num).toDouble(),
-          );
-
+              0.0, (sum, expense) => sum + (expense.amount as num).toDouble());
+          _nameController.text = profile['name'] ?? '';
+          _budgetController.text = _monthlyBudget.toString();
+          _selectedCurrency = profile['defaultCurrency'] ?? 'INR';
           _isLoading = false;
         });
       }
@@ -95,57 +109,60 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _updateProfileImage() async {
+  Future<void> _saveProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
     try {
-      final imageUrl = await _firebaseService.updateProfileImage();
-      if (imageUrl != null) {
-        await _firebaseService.updateUserProfile({'profileImage': imageUrl});
-        _loadProfileData();
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(FirebaseAuth.instance.currentUser!.uid)
+          .update({
+        'name': _nameController.text.trim(),
+        'defaultCurrency': _selectedCurrency, // Update the currency field here
+        'monthlyBudget': double.parse(_budgetController.text),
+      });
+
+      setState(() {
+        _isEditing = false;
+      });
+
+      // Reload profile data after update
+      await _loadProfileData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile updated successfully')),
+        );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating profile image: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating profile: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
-
-    // Prevent NaN calculation by ensuring monthlyBudget is not zero
-    double monthlyProgress =
-        _monthlyBudget > 0 ? (_monthlySpending / _monthlyBudget) * 100 : 0.0;
 
     return Scaffold(
       appBar: AppBar(
-        title: Center(
-          child: Text(
-            'Profile',
-            style: TextStyle(
-              fontSize: 22,
-              color: hexToColor('#FF6F61'),
-              fontWeight: FontWeight.bold,
-              fontStyle: FontStyle.italic,
-              fontFamily: 'Times New Roman',
-              textBaseline: TextBaseline.alphabetic,
-            ),
-          ),
-        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await _firebaseService.signOut();
-              if (mounted) {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                );
-              }
-            },
+            icon: Icon(_isEditing ? Icons.save : Icons.edit),
+            onPressed: _isEditing
+                ? _saveProfile
+                : () => setState(() => _isEditing = true),
           ),
         ],
       ),
@@ -154,150 +171,195 @@ class _ProfilePageState extends State<ProfilePage> {
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              GestureDetector(
-                onTap: _updateProfileImage,
-                child: Stack(
-                  alignment: Alignment.bottomRight,
-                  children: [
-                    CircleAvatar(
-                      radius: 50, // Adjust the radius as needed
-                      backgroundImage: NetworkImage(
-                        _userProfile?['profileImage'] ??
-                            '', // Your image URL here
-                      ),
-                      backgroundColor: Colors.grey[
-                          200], // Fallback background color if image fails to load
-                      child: _userProfile?['profileImage'] == null
-                          ? const Icon(Icons.person,
-                              size: 50) // Placeholder icon if no image
-                          : null, // If image exists, no child is required
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor,
-                        shape: BoxShape.circle,
-                      ),
-                      child:
-                          const Icon(Icons.edit, color: Colors.white, size: 20),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              Card(
-                child: ListTile(
-                  title: Text(_userProfile?['name'] ?? 'No name'),
-                  subtitle: Text(_userProfile?['email'] ?? 'No email'),
-                  leading: const Icon(Icons.person_outline),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _StatCard(
-                      title: 'Monthly Budget',
-                      amount: _monthlyBudget,
-                      icon: Icons.account_balance_wallet,
-                      color: Colors.blue,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _StatCard(
-                      title: 'Monthly Spending',
-                      amount: _monthlySpending,
-                      icon: Icons.shopping_cart,
-                      color: _monthlySpending > _monthlyBudget
-                          ? Colors.red
-                          : Colors.green,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                GestureDetector(
+                  onTap: _isEditing ? _updateProfileImage : null,
+                  child: Stack(
+                    alignment: Alignment.bottomRight,
                     children: [
-                      Text(
-                        'Budget Status',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      LinearProgressIndicator(
-                        value: _monthlyBudget > 0
-                            ? (_monthlySpending / _monthlyBudget)
-                                .clamp(0.0, 1.0)
-                            : 0,
-                        minHeight: 10,
+                      CircleAvatar(
+                        radius: 50,
                         backgroundColor: Colors.grey[200],
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          _monthlySpending > _monthlyBudget * 0.8
-                              ? Colors.red
-                              : Colors.green,
+                        backgroundImage: _userProfile?['profileImage'] != null
+                            ? NetworkImage(_userProfile!['profileImage'])
+                            : null,
+                        child: _userProfile?['profileImage'] == null
+                            ? const Icon(Icons.person,
+                                size: 50, color: Colors.grey)
+                            : null,
+                      ),
+                      if (_isEditing)
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).primaryColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.camera_alt,
+                              color: Colors.white, size: 20),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Monthly Progress: ${monthlyProgress.toStringAsFixed(1)}%',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
                     ],
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 24),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        _isEditing
+                            ? TextFormField(
+                                controller: _nameController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Name',
+                                  border: OutlineInputBorder(),
+                                ),
+                                validator: (value) => value?.isEmpty ?? true
+                                    ? 'Name is required'
+                                    : null,
+                              )
+                            : ListTile(
+                                title: const Text('Name'),
+                                subtitle: Text(_userProfile?['name'] ?? ''),
+                                leading: const Icon(Icons.person_outline),
+                              ),
+                        const SizedBox(height: 16),
+                        ListTile(
+                          title: const Text('Email'),
+                          subtitle: Text(_userProfile?['email'] ?? ''),
+                          leading: const Icon(Icons.email_outlined),
+                        ),
+                        const SizedBox(height: 16),
+                        _isEditing
+                            ? TextFormField(
+                                controller: _budgetController,
+                                decoration: InputDecoration(
+                                  labelText: 'Monthly Budget',
+                                  border: const OutlineInputBorder(),
+                                  prefixText: _currencySymbol,
+                                ),
+                                keyboardType: TextInputType.number,
+                                validator: (value) {
+                                  if (value?.isEmpty ?? true) {
+                                    return 'Budget is required';
+                                  }
+                                  if (double.tryParse(value!) == null) {
+                                    return 'Please enter a valid number';
+                                  }
+                                  return null;
+                                },
+                              )
+                            : ListTile(
+                                title: const Text('Monthly Budget'),
+                                subtitle: Text(
+                                  concatenateStringAndDouble(
+                                      _currencySymbol, _monthlyBudget),
+                                ),
+                                leading:
+                                    const Icon(Icons.account_balance_wallet),
+                              ),
+                        const SizedBox(height: 16),
+                        ListTile(
+                          title: const Text('Monthly Spending'),
+                          subtitle: Text(
+                            concatenateStringAndDouble(
+                              _currencySymbol,
+                              _monthlySpending,
+                            ),
+                          ),
+                          leading: const Icon(Icons.shopping_cart_outlined),
+                        ),
+                        const SizedBox(height: 16),
+                        _isEditing
+                            ? DropdownButtonFormField<String>(
+                                value: _selectedCurrency,
+                                onChanged: (String? newValue) {
+                                  setState(() {
+                                    _selectedCurrency = newValue;
+                                  });
+                                },
+                                decoration: const InputDecoration(
+                                  labelText: 'Currency',
+                                  border: OutlineInputBorder(),
+                                ),
+                                items:
+                                    currencySymbols.keys.map((defaultCurrency) {
+                                  return DropdownMenuItem<String>(
+                                    value: defaultCurrency,
+                                    child: Text(
+                                        '$defaultCurrency  - ${currencySymbols[defaultCurrency]}'),
+                                  );
+                                }).toList(),
+                              )
+                            : ListTile(
+                                title: const Text('Currency'),
+                                subtitle: Text(
+                                    _userProfile?['defaultCurrency'] ?? 'INR'),
+                                leading:
+                                    const Icon(Icons.monetization_on_outlined),
+                              ),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
-}
 
-class _StatCard extends StatelessWidget {
-  final String title;
-  final double amount;
-  final IconData icon;
-  final Color color;
+  Future<void> _updateProfileImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? pickedFile =
+        await picker.pickImage(source: ImageSource.gallery);
 
-  const _StatCard({
-    required this.title,
-    required this.amount,
-    required this.icon,
-    required this.color,
-  });
+    if (pickedFile == null) return;
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              NumberFormat.currency(symbol: '\$').format(amount),
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final String userId = FirebaseAuth.instance.currentUser!.uid;
+      final File file = File(pickedFile.path);
+      final String fileName =
+          'profile_images/$userId/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final Reference storageRef =
+          FirebaseStorage.instance.ref().child(fileName);
+      final UploadTask uploadTask = storageRef.putFile(file);
+
+      final TaskSnapshot snapshot = await uploadTask;
+      final String downloadUrl = await snapshot.ref.getDownloadURL();
+
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        'profileImage': downloadUrl,
+      });
+
+      setState(() {
+        _userProfile?['profileImage'] = downloadUrl;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Profile image updated successfully'),
+      ));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error updating profile image: $e'),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String concatenateStringAndDouble(String str, double num) {
+    return '$str${num.toStringAsFixed(2)}';
   }
 }

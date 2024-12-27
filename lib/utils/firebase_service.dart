@@ -9,8 +9,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path/path.dart';
-// import 'dart:typed_data';
+import 'package:path/path.dart' as path;
 
 class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -22,67 +21,6 @@ class FirebaseService {
     return await _auth.signInWithEmailAndPassword(
         email: email, password: password);
   }
-
-  // Future<UserCredential> register({
-  //   required String email,
-  //   required String password,
-  //   required String name,
-  //   String? profileImagePath,
-  // }) async {
-  //   try {
-  //     // 1. First create the user account
-  //     UserCredential credential = await _auth.createUserWithEmailAndPassword(
-  //       email: email,
-  //       password: password,
-  //     );
-
-  //     String? imageUrl;
-
-  //     // 2. If there's a profile image, upload it
-  //     if (profileImagePath != null) {
-  //       final String fileName =
-  //           'profile_${credential.user!.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-  //       final Reference storageRef =
-  //           _storage.ref().child('profile_images/$fileName');
-
-  //       UploadTask uploadTask;
-
-  //       if (kIsWeb) {
-  //         // For web platform
-  //         final XFile imageFile = XFile(profileImagePath);
-  //         final Uint8List imageBytes = await imageFile.readAsBytes();
-  //         uploadTask = storageRef.putData(
-  //           imageBytes,
-  //           SettableMetadata(contentType: 'image/jpeg'),
-  //         );
-  //       } else {
-  //         // For mobile platforms
-  //         final File imageFile = File(profileImagePath);
-  //         uploadTask = storageRef.putFile(imageFile);
-  //       }
-
-  //       // Wait for upload to complete and get URL
-  //       final TaskSnapshot taskSnapshot = await uploadTask;
-  //       imageUrl = await taskSnapshot.ref.getDownloadURL();
-  //     }
-
-  //     // 3. Create the user profile in Firestore
-  //     await _firestore.collection('users').doc(credential.user!.uid).set({
-  //       'name': name,
-  //       'email': email,
-  //       'profileImage': imageUrl,
-  //       'defaultCurrency': 'USD',
-  //       'createdAt': FieldValue.serverTimestamp(),
-  //     });
-
-  //     return credential;
-  //   } catch (e) {
-  //     if (kDebugMode) {
-  //       print('Error during registration: $e');
-  //     }
-  //     rethrow;
-  //   }
-  // }
 
   Future<UserCredential> register({
     required String email,
@@ -155,12 +93,24 @@ class FirebaseService {
 
   // Profile methods
   Future<Map<String, dynamic>> getUserProfile() async {
-    String? userId = _auth.currentUser?.uid;
-    if (userId == null) throw Exception('User not authenticated');
+    try {
+      String? userId = _auth.currentUser?.uid;
+      if (userId == null) throw Exception('User not authenticated');
 
-    DocumentSnapshot doc =
-        await _firestore.collection('users').doc(userId).get();
-    return doc.data() as Map<String, dynamic>;
+      DocumentSnapshot doc =
+          await _firestore.collection('users').doc(userId).get();
+
+      if (!doc.exists) {
+        throw Exception('User profile not found');
+      }
+
+      return doc.data() as Map<String, dynamic>;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error fetching user profile: $e');
+      }
+      rethrow;
+    }
   }
 
   Future<void> updateUserProfile(Map<String, dynamic> data) async {
@@ -172,6 +122,11 @@ class FirebaseService {
 
   Future<String?> updateProfileImage() async {
     try {
+      // Get current user
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('No user logged in');
+
+      // Pick image
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(
         source: ImageSource.gallery,
@@ -182,46 +137,59 @@ class FirebaseService {
 
       if (image == null) return null;
 
-      final String userId = _auth.currentUser?.uid ?? '';
-      if (userId.isEmpty) throw Exception('User not authenticated');
-
-      // Generate a unique filename
+      // Generate a unique filename using user ID and timestamp
       final String fileName =
-          'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+          'profile_${user.uid}_${DateTime.now().millisecondsSinceEpoch}${path.extension(image.path)}';
       final Reference storageRef =
           _storage.ref().child('profile_images/$fileName');
 
-      UploadTask uploadTask;
+      // Delete old profile image if it exists
+      try {
+        final userDoc =
+            await _firestore.collection('users').doc(user.uid).get();
+        final userData = userDoc.data();
+        if (userData != null && userData['profileImage'] != null) {
+          final oldImageUrl = userData['profileImage'] as String;
+          if (oldImageUrl.isNotEmpty) {
+            await _storage.refFromURL(oldImageUrl).delete();
+          }
+        }
+      } catch (e) {
+        // Log error but continue with upload
+        if (kDebugMode) {
+          print('Error deleting old profile image: $e');
+        }
+      }
 
+      // Upload new image
+      UploadTask uploadTask;
       if (kIsWeb) {
         // Handle web platform
-        final Uint8List imageBytes = await image.readAsBytes();
+        final bytes = await image.readAsBytes();
         uploadTask = storageRef.putData(
-          imageBytes,
+          bytes,
           SettableMetadata(contentType: 'image/jpeg'),
         );
       } else {
         // Handle mobile platforms
-        final File imageFile = File(image.path);
-        uploadTask = storageRef.putData(
-          await imageFile.readAsBytes(),
-          SettableMetadata(contentType: 'image/jpeg'),
-        );
+        final imageFile = File(image.path);
+        uploadTask = storageRef.putFile(imageFile);
       }
 
-      // Wait for the upload to complete
+      // Wait for upload to complete
       final TaskSnapshot taskSnapshot = await uploadTask;
-
-      // Get the download URL
       final String downloadUrl = await taskSnapshot.ref.getDownloadURL();
 
       // Update user profile with new image URL
-      await updateUserProfile({'profileImage': downloadUrl});
+      await _firestore.collection('users').doc(user.uid).update({
+        'profileImage': downloadUrl,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
 
       return downloadUrl;
     } catch (e) {
       if (kDebugMode) {
-        print('Error uploading profile image: $e');
+        print('Error updating profile image: $e');
       }
       rethrow;
     }
@@ -430,32 +398,15 @@ class FirebaseService {
         .collection('budgets')
         .snapshots()
         .map((querySnapshot) {
-      if (querySnapshot.docs.isEmpty) {
-        if (kDebugMode) {
-          print('No budget documents found for user $userId');
-        }
-        return [];
-      }
-
       return querySnapshot.docs.map((doc) {
-        try {
-          Map<String, dynamic> data = doc.data();
-          if (kDebugMode) {
-            print('Budget data: $data');
-          }
-          return Budget(
-            amount: data['amount'] ?? 0.0,
-            period: data['period'] ?? 'monthly',
-            currency: data['currency'] ?? 'INR',
-            startDate:
-                (data['startDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
-          );
-        } catch (e) {
-          if (kDebugMode) {
-            print('Error parsing budget document: $e');
-          }
-          rethrow;
-        }
+        Map<String, dynamic> data = doc.data();
+        return Budget(
+          amount: (data['amount'] ?? 0.0).toDouble(),
+          period: data['period'] ?? 'monthly',
+          currency: data['currency'] ?? 'INR',
+          startDate:
+              (data['startDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        );
       }).toList();
     });
   }
@@ -509,50 +460,64 @@ class FirebaseService {
     }
   }
 
+  // Add these methods to FirebaseService class
+
   Future<void> updateProfileWithBudget({
-    required String? imageUrl,
+    String? imageUrl,
     required double monthlyBudget,
     required String currency,
+    required String name,
   }) async {
     try {
-      final String userId = _auth.currentUser?.uid ?? '';
-      if (userId.isEmpty) throw Exception('User not authenticated');
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('No user logged in');
 
-      // Create a batch write
       WriteBatch batch = _firestore.batch();
+      DocumentReference userRef = _firestore.collection('users').doc(user.uid);
 
-      // Update profile document
-      DocumentReference userRef = _firestore.collection('users').doc(userId);
-      Map<String, dynamic> updateData = {
-        'monthlyBudget': monthlyBudget,
-        'defaultCurrency': currency,
+      // Update profile
+      Map<String, dynamic> profileUpdate = {
+        'name': name,
         'lastUpdated': FieldValue.serverTimestamp(),
       };
 
+      // Only update image if a new one is provided
       if (imageUrl != null) {
-        updateData['profileImage'] = imageUrl;
+        profileUpdate['profileImage'] = imageUrl;
       }
 
-      batch.update(userRef, updateData);
+      batch.update(userRef, profileUpdate);
 
-      // Update or create monthly budget document
-      DocumentReference budgetRef = _firestore
+      // Update or create budget
+      QuerySnapshot budgetQuery = await _firestore
           .collection('users')
-          .doc(userId)
+          .doc(user.uid)
           .collection('budgets')
-          .doc('monthly');
+          .limit(1)
+          .get();
 
-      batch.set(
-          budgetRef,
-          {
-            'amount': monthlyBudget,
-            'currency': currency,
-            'period': 'monthly',
-            'startDate': DateTime.now().toIso8601String(),
-          },
-          SetOptions(merge: true));
+      if (budgetQuery.docs.isNotEmpty) {
+        DocumentReference budgetRef = budgetQuery.docs.first.reference;
+        batch.update(budgetRef, {
+          'amount': monthlyBudget,
+          'currency': currency,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        DocumentReference newBudgetRef = _firestore
+            .collection('users')
+            .doc(user.uid)
+            .collection('budgets')
+            .doc();
+        batch.set(newBudgetRef, {
+          'amount': monthlyBudget,
+          'currency': currency,
+          'period': 'monthly',
+          'startDate': DateTime.now(),
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
 
-      // Commit the batch
       await batch.commit();
     } catch (e) {
       if (kDebugMode) {
@@ -659,14 +624,12 @@ class FirebaseService {
     if (userId == null) throw Exception('User not authenticated');
 
     try {
-      // Reference to the expense document
       final docRef = _firestore
           .collection('users')
           .doc(userId)
           .collection('expenses')
           .doc(expense.id);
 
-      // Check if document exists
       final docSnapshot = await docRef.get();
       if (!docSnapshot.exists) {
         throw Exception('Expense document not found');
@@ -683,17 +646,16 @@ class FirebaseService {
               throw Exception('Failed to upload image');
             }
 
-            // If successful upload and there was an old image, delete it
+            // Delete old image only if it's not the placeholder
             final oldData = docSnapshot.data() as Map<String, dynamic>;
             if (oldData['imageUrl'] != null &&
-                oldData['imageUrl'].toString().startsWith('http')) {
+                oldData['imageUrl'].toString().startsWith('http') &&
+                !oldData['imageUrl'].toString().contains('placeholder.com')) {
               try {
-                // Extract old image path from URL
                 final oldImageRef =
                     FirebaseStorage.instance.refFromURL(oldData['imageUrl']);
                 await oldImageRef.delete();
               } catch (e) {
-                // Log error but don't fail the update
                 if (kDebugMode) {
                   print('Warning: Failed to delete old image: $e');
                 }
@@ -703,24 +665,14 @@ class FirebaseService {
             throw Exception('Error uploading new image: $uploadError');
           }
         } else {
-          // Existing image URL, keep it
-          imageUrl = expense.imagePath;
+          // If it's an existing image URL and not the placeholder, keep it
+          imageUrl = expense.imagePath!.contains('placeholder.com')
+              ? 'https://via.placeholder.com/150'
+              : expense.imagePath;
         }
       } else {
-        // If imagePath is null and there was an old image, delete it
-        final oldData = docSnapshot.data() as Map<String, dynamic>;
-        if (oldData['imageUrl'] != null &&
-            oldData['imageUrl'].toString().startsWith('http')) {
-          try {
-            final oldImageRef =
-                FirebaseStorage.instance.refFromURL(oldData['imageUrl']);
-            await oldImageRef.delete();
-          } catch (e) {
-            if (kDebugMode) {
-              print('Warning: Failed to delete old image: $e');
-            }
-          }
-        }
+        // If imagePath is null, use placeholder
+        imageUrl = 'https://via.placeholder.com/150';
       }
 
       // Create update data map
@@ -731,15 +683,8 @@ class FirebaseService {
         'date': expense.date.toIso8601String(),
         'currency': expense.currency,
         'updatedAt': FieldValue.serverTimestamp(),
+        'imageUrl': imageUrl, // Always include imageUrl in update
       };
-
-      // Handle image URL in update data
-      if (imageUrl != null) {
-        updateData['imageUrl'] = imageUrl;
-      } else {
-        // If no image URL, remove the field from Firestore
-        updateData['imageUrl'] = FieldValue.delete();
-      }
 
       // Update the document with transaction to ensure atomicity
       await _firestore.runTransaction((transaction) async {
@@ -766,163 +711,20 @@ class FirebaseService {
             throw Exception('Firebase error: ${e.message}');
         }
       }
-      // Handle custom exception for document deletion
       if (e.toString() ==
           'Exception: Expense document was deleted during update') {
-        // Show a message to the user and reload the data
-        ScaffoldMessenger.of(context as BuildContext).showSnackBar(
-          SnackBar(
-              content: Text(
-                  'The expense was deleted or no longer exists. Please refresh the list.')),
+        ScaffoldMessenger.of(path.context as BuildContext).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'The expense was deleted or no longer exists. Please refresh the list.'),
+          ),
         );
-        // Optionally, reload the expense list
-        // Refresh the data or navigate to another screen
         MaterialPageRoute(builder: (context) => ProfilePage());
       } else {
-        // Re-throw the custom exceptions or unexpected errors
         rethrow;
       }
     }
   }
-
-  // Future<void> updateExpense(ExpenseModel expense) async {
-  //   String? userId = _auth.currentUser?.uid;
-  //   if (userId == null) throw Exception('User not authenticated');
-
-  //   try {
-  //     // Reference to the expense document
-  //     final docRef = _firestore
-  //         .collection('users')
-  //         .doc(userId)
-  //         .collection('expenses')
-  //         .doc(expense.id);
-
-  //     // Retry mechanism for fetching the document
-  //     int retryCount = 0;
-  //     DocumentSnapshot? docSnapshot;
-  //     while (retryCount < 3) {
-  //       try {
-  //         docSnapshot = await docRef.get();
-  //         if (docSnapshot.exists) {
-  //           break; // Document exists, proceed with the update
-  //         } else {
-  //           throw Exception('Expense document not found');
-  //         }
-  //       } catch (e) {
-  //         retryCount++;
-  //         if (retryCount == 3) {
-  //           throw Exception('Failed to fetch document after multiple attempts');
-  //         }
-  //         await Future.delayed(
-  //             const Duration(seconds: 2)); // Wait before retrying
-  //       }
-  //     }
-
-  //     // Now docSnapshot is guaranteed to be assigned
-  //     if (docSnapshot == null || !docSnapshot.exists) {
-  //       throw Exception('Expense document not found');
-  //     }
-
-  //     String? imageUrl;
-  //     // Handle image update
-  //     if (expense.imagePath != null) {
-  //       if (!expense.imagePath!.startsWith('http')) {
-  //         // New image file to upload
-  //         try {
-  //           imageUrl = await uploadExpenseImage(expense.imagePath!);
-  //           if (imageUrl == null) {
-  //             throw Exception('Failed to upload new image');
-  //           }
-
-  //           // If successful upload and there was an old image, delete it
-  //           final oldData = docSnapshot.data() as Map<String, dynamic>;
-  //           if (oldData['imageUrl'] != null &&
-  //               oldData['imageUrl'].toString().startsWith('http')) {
-  //             try {
-  //               // Extract old image path from URL and delete
-  //               final oldImageRef =
-  //                   FirebaseStorage.instance.refFromURL(oldData['imageUrl']);
-  //               await oldImageRef.delete();
-  //             } catch (e) {
-  //               print('Warning: Failed to delete old image: $e');
-  //             }
-  //           }
-  //         } catch (uploadError) {
-  //           print('Error uploading new image: $uploadError');
-  //           throw Exception('Error uploading new image');
-  //         }
-  //       } else {
-  //         // Existing image URL, keep it
-  //         imageUrl = expense.imagePath;
-  //       }
-  //     } else {
-  //       // If imagePath is null and there was an old image, delete it
-  //       final oldData = docSnapshot.data() as Map<String, dynamic>;
-  //       if (oldData['imageUrl'] != null &&
-  //           oldData['imageUrl'].toString().startsWith('http')) {
-  //         try {
-  //           final oldImageRef =
-  //               FirebaseStorage.instance.refFromURL(oldData['imageUrl']);
-  //           await oldImageRef.delete();
-  //         } catch (e) {
-  //           print('Warning: Failed to delete old image: $e');
-  //         }
-  //       }
-  //     }
-
-  //     // Prepare the data for update
-  //     Map<String, dynamic> updateData = {
-  //       'amount': expense.amount,
-  //       'category': expense.category,
-  //       'description': expense.description,
-  //       'date': expense.date.toIso8601String(),
-  //       'currency': expense.currency,
-  //       'updatedAt': FieldValue.serverTimestamp(),
-  //     };
-
-  //     // Include image URL if available
-  //     if (imageUrl != null) {
-  //       updateData['imageUrl'] = imageUrl;
-  //     } else {
-  //       // If no image URL, delete the image field from Firestore
-  //       updateData['imageUrl'] = FieldValue.delete();
-  //     }
-
-  //     // Firestore transaction to ensure atomicity
-  //     await _firestore.runTransaction((transaction) async {
-  //       final freshSnapshot = await transaction.get(docRef);
-  //       if (!freshSnapshot.exists) {
-  //         throw Exception('Expense document was deleted during update');
-  //       }
-  //       transaction.update(docRef, updateData);
-  //     });
-  //   } catch (e) {
-  //     if (e is FirebaseException) {
-  //       switch (e.code) {
-  //         case 'permission-denied':
-  //           throw Exception(
-  //               'You do not have permission to update this expense');
-  //         case 'not-found':
-  //           throw Exception('The expense no longer exists');
-  //         case 'unavailable':
-  //           throw Exception(
-  //               'Service temporarily unavailable. Please try again');
-  //         case 'cancelled':
-  //           throw Exception('Operation cancelled. Please try again');
-  //         default:
-  //           throw Exception('Firebase error: ${e.message}');
-  //       }
-  //     }
-
-  //     // Re-throw the custom exceptions
-  //     if (e is Exception) {
-  //       rethrow;
-  //     }
-
-  //     // For any other errors
-  //     throw Exception('Error updating expense: $e');
-  //   }
-  // }
 
   Future<bool> checkExpenseExists(String expenseId) async {
     try {
