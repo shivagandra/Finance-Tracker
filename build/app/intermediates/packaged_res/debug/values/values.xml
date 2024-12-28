@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="firebase_database_url" translatable="false">https://personal-finance-tracker-e8905-default-rtdb.asia-southeast1.firebasedatabase.app</string>
+    <string name="gcm_defaultSenderId" translatable="false">741105956958</string>
+    <string name="google_api_key" translatable="false">AIzaSyD6Id9rFncOEZPVwvZG7FQ1IKl3tlUB-64</string>
+    <string name="google_app_id" translatable="false">1:741105956958:android:2ddcc5ce267a87b5965ccf</string>
+    <string name="google_crash_reporting_api_key" translatable="false">AIzaSyD6Id9rFncOEZPVwvZG7FQ1IKl3tlUB-64</string>
+    <string name="google_storage_bucket" translatable="false">personal-finance-tracker-e8905.firebasestorage.app</string>
+    <string name="project_id" translatable="false">personal-finance-tracker-e8905</string>
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>
