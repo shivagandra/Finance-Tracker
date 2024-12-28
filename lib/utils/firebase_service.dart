@@ -17,7 +17,8 @@ class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final String _defaultImageUrl =
       'https://firebasestorage.googleapis.com/v0/b/personal-finance-tracker-e8905.firebasestorage.app/o/default_images%2Fdemo_bill.jpg?alt=media&token=2e945572-80ff-47ba-9b67-71ae5317f915';
-
+  final String _profileImageUrl =
+      'https://firebasestorage.googleapis.com/v0/b/personal-finance-tracker-e8905.firebasestorage.app/o/default_images%2Fperson.png?alt=media&token=1c590bc6-6dd5-4abd-9ecc-2cb37d63569c';
   // Auth methods
   Future<UserCredential> signIn(String email, String password) async {
     return await _auth.signInWithEmailAndPassword(
@@ -136,8 +137,9 @@ class FirebaseService {
         imageQuality: 85,
       );
 
-      if (image == null)
-        return Image(image: AssetImage('assets/images/person.png'));
+      if (image == null) {
+        return Image.network(_profileImageUrl);
+      }
 
       // Delete old profile image if it exists
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
@@ -198,90 +200,11 @@ class FirebaseService {
         (data['profileImage'] == null ||
             data['profileImage'].toString().isEmpty)) {
       // Set it to the default asset path
-      data['profileImage'] = 'assets/images/person.png';
+      data['profileImage'] = _profileImageUrl;
     }
 
     await _firestore.collection('users').doc(userId).update(data);
   }
-
-  // Future<void> updateProfileWithBudget({
-  //   String? imageUrl,
-  //   required double monthlyBudget,
-  //   required String currency,
-  //   required String name,
-  // }) async {
-  //   try {
-  //     final user = _auth.currentUser;
-  //     if (user == null) throw Exception('No user logged in');
-
-  //     WriteBatch batch = _firestore.batch();
-  //     DocumentReference userRef = _firestore.collection('users').doc(user.uid);
-
-  //     // If a new image is being set
-  //     if (imageUrl != null) {
-  //       // Delete old image if it exists
-  //       final userDoc = await userRef.get();
-  //       final userData = userDoc.data() as Map<String, dynamic>?;
-  //       if (userData != null && userData['profileImage'] != null) {
-  //         final oldImageUrl = userData['profileImage'] as String;
-  //         if (oldImageUrl.startsWith('http')) {
-  //           try {
-  //             await _storage.refFromURL(oldImageUrl).delete();
-  //           } catch (e) {
-  //             throw Exception('Failed to delete old profile image: $e');
-  //           }
-  //         }
-  //       }
-  //     }
-
-  //     // Update profile
-  //     Map<String, dynamic> profileUpdate = {
-  //       'name': name,
-  //       'lastUpdated': FieldValue.serverTimestamp(),
-  //       // Use the provided imageUrl or default to asset path
-  //       'profileImage': imageUrl ?? 'assets/images/person.png',
-  //     };
-
-  //     batch.update(userRef, profileUpdate);
-
-  //     // Update or create budget
-  //     QuerySnapshot budgetQuery = await _firestore
-  //         .collection('users')
-  //         .doc(user.uid)
-  //         .collection('budgets')
-  //         .limit(1)
-  //         .get();
-
-  //     if (budgetQuery.docs.isNotEmpty) {
-  //       DocumentReference budgetRef = budgetQuery.docs.first.reference;
-  //       batch.update(budgetRef, {
-  //         'amount': monthlyBudget,
-  //         'currency': currency,
-  //         'updatedAt': FieldValue.serverTimestamp(),
-  //       });
-  //     } else {
-  //       DocumentReference newBudgetRef = _firestore
-  //           .collection('users')
-  //           .doc(user.uid)
-  //           .collection('budgets')
-  //           .doc();
-  //       batch.set(newBudgetRef, {
-  //         'amount': monthlyBudget,
-  //         'currency': currency,
-  //         'period': 'monthly',
-  //         'startDate': DateTime.now(),
-  //         'createdAt': FieldValue.serverTimestamp(),
-  //       });
-  //     }
-
-  //     await batch.commit();
-  //   } catch (e) {
-  //     if (kDebugMode) {
-  //       print('Error updating profile and budget: $e');
-  //     }
-  //     rethrow;
-  //   }
-  // }
 
   Future<void> addExpense(ExpenseModel expense) async {
     String? userId = _auth.currentUser?.uid;
