@@ -256,6 +256,26 @@ class ExpenseService {
     }
   }
 
+  Future<List<ExpenseModel>> getExpensesByDateRange({
+    required DateTime startDate,
+    required DateTime endDate,
+    String? category,
+  }) async {
+    Query query = _firestore
+        .collection('expenses')
+        .where('date', isGreaterThanOrEqualTo: startDate)
+        .where('date', isLessThan: endDate);
+
+    if (category != null) {
+      query = query.where('category', isEqualTo: category);
+    }
+
+    final snapshot = await query.get();
+    return snapshot.docs
+        .map((doc) => ExpenseModel.fromMap(doc.data() as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<ExpenseModel>> getExpensesByCategory({String? category}) async {
     String? userId = _auth.currentUser?.uid;
     if (userId == null) throw Exception('User not authenticated');

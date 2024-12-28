@@ -15,6 +15,8 @@ class FirebaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final String _defaultImageUrl =
+      'https://firebasestorage.googleapis.com/v0/b/personal-finance-tracker-e8905.firebasestorage.app/o/default_images%2Fdemo_bill.jpg?alt=media&token=2e945572-80ff-47ba-9b67-71ae5317f915';
 
   // Auth methods
   Future<UserCredential> signIn(String email, String password) async {
@@ -907,11 +909,11 @@ class FirebaseService {
           // Keep existing Firebase URL, otherwise use asset path
           imageUrl = expense.imagePath!.startsWith('http')
               ? expense.imagePath
-              : 'assets/images/demo_bill.jpg';
+              : _defaultImageUrl;
         }
       } else {
         // If imagePath is null, use local asset path
-        imageUrl = 'assets/images/demo_bill.jpg';
+        imageUrl = _defaultImageUrl;
       }
 
       // Create update data map

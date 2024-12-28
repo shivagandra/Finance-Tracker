@@ -40,6 +40,9 @@ class _ExpenseViewScreenState extends State<ExpenseViewScreen> {
 
       setState(() {
         _expenses.addAll(newExpenses);
+        //add filter to display only expenses from current month
+        _expenses.removeWhere(
+            (element) => element.date.month != DateTime.now().month);
         _hasMore = newExpenses.length == _pageSize;
         _isLoading = false;
       });
@@ -164,25 +167,81 @@ class _ExpenseViewScreenState extends State<ExpenseViewScreen> {
     );
   }
 
+  // Widget _buildExpensesList() {
+  //   if (_expenses.isEmpty) {
+  //     return _isLoading
+  //         ? const Center(child: CircularProgressIndicator())
+  //         : const Center(child: Text('No expenses found'));
+  //   }
+  //   return ListView.builder(
+  //     padding: const EdgeInsets.all(8),
+  //     itemCount: _expenses.length + (_hasMore ? 1 : 0),
+  //     itemBuilder: (context, index) {
+  //       if (index == _expenses.length) {
+  //         _loadExpenses();
+  //         return const Center(
+  //           child: Padding(
+  //             padding: EdgeInsets.all(16),
+  //             child: CircularProgressIndicator(),
+  //           ),
+  //         );
+  //       }
+  //       final expense = _expenses[index];
+  //       return Dismissible(
+  //         key: Key(expense.id),
+  //         direction: DismissDirection.endToStart,
+  //         background: Container(
+  //           color: Colors.red,
+  //           alignment: Alignment.centerRight,
+  //           padding: const EdgeInsets.only(right: 16),
+  //           child: const Icon(Icons.delete, color: Colors.white),
+  //         ),
+  //         onDismissed: (_) => _deleteExpense(expense),
+  //         child: Card(
+  //           elevation: 2,
+  //           margin: const EdgeInsets.symmetric(vertical: 4),
+  //           child: ListTile(
+  //             onTap: () => _viewExpenseDetails(expense),
+  //             leading: CircleAvatar(
+  //               backgroundColor: Theme.of(context).primaryColor,
+  //               child: Text(
+  //                 expense.category[0].toUpperCase(),
+  //                 style: const TextStyle(color: Colors.white),
+  //               ),
+  //             ),
+  //             title: Text(
+  //               expense.description,
+  //               style: const TextStyle(fontWeight: FontWeight.bold),
+  //             ),
+  //             subtitle: Text(
+  //               DateFormat('MMM dd, yyyy').format(expense.date),
+  //             ),
+  //             trailing: Text(
+  //               '${expense.currency} ${expense.amount.toStringAsFixed(2)}',
+  //               style: const TextStyle(
+  //                 fontWeight: FontWeight.bold,
+  //                 fontSize: 16,
+  //               ),
+  //             ),
+  //           ),
+  //         ),
+  //       );
+  //     },
+  //   );
+  // }
   Widget _buildExpensesList() {
-    if (_expenses.isEmpty) {
-      return _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : const Center(child: Text('No expenses found'));
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
     }
+
+    if (_expenses.isEmpty) {
+      return const Center(child: Text('No expenses found'));
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.all(8),
-      itemCount: _expenses.length + (_hasMore ? 1 : 0),
+      itemCount: _expenses.length,
       itemBuilder: (context, index) {
-        if (index == _expenses.length) {
-          _loadExpenses();
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: CircularProgressIndicator(),
-            ),
-          );
-        }
         final expense = _expenses[index];
         return Dismissible(
           key: Key(expense.id),
@@ -193,6 +252,29 @@ class _ExpenseViewScreenState extends State<ExpenseViewScreen> {
             padding: const EdgeInsets.only(right: 16),
             child: const Icon(Icons.delete, color: Colors.white),
           ),
+          confirmDismiss: (direction) async {
+            return await showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: const Text('Confirm Delete'),
+                  content: Text(
+                      'Are you sure you want to delete ${expense.description}?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('CANCEL'),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: const Text('DELETE'),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
           onDismissed: (_) => _deleteExpense(expense),
           child: Card(
             elevation: 2,

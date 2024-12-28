@@ -317,6 +317,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   bool _isLoading = false;
   String? _imageUrl;
   DateTime _selectedDate = DateTime.now();
+  final String _defaultImageUrl =
+      'https://firebasestorage.googleapis.com/v0/b/personal-finance-tracker-e8905.firebasestorage.app/o/default_images%2Fdemo_bill.jpg?alt=media&token=2e945572-80ff-47ba-9b67-71ae5317f915';
 
   Future<void> _saveExpense() async {
     if (_descriptionController.text.isEmpty ||
@@ -330,7 +332,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     }
 
     // Use default asset image path if no image is selected
-    final imagePath = _imageUrl ?? 'assets/images/demo_bill.jpg';
+    final imagePath = _imageUrl ?? _defaultImageUrl;
 
     // Create DateTime with selected date but current time
     final now = DateTime.now();
@@ -466,16 +468,10 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       _imageUrl!,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
-                        return Image(
-                          image: AssetImage('assets/images/demo_bill.jpg'),
-                          fit: BoxFit.cover,
-                        );
+                        return Image.network(_defaultImageUrl);
                       },
                     )
-                  : Image(
-                      image: AssetImage('assets/images/demo_bill.jpg'),
-                      fit: BoxFit.cover,
-                    ),
+                  : Image.network(_defaultImageUrl),
         ),
         const SizedBox(height: 16),
         ElevatedButton.icon(

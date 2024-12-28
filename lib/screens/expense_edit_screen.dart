@@ -27,6 +27,8 @@ class _ExpenseEditScreenState extends State<ExpenseEditScreen> {
   // final FirebaseStorage _storage = FirebaseStorage.instance;
   bool _isLoading = false;
   String? _imageUrl;
+  final String _defaultImageUrl =
+      'https://firebasestorage.googleapis.com/v0/b/personal-finance-tracker-e8905.firebasestorage.app/o/default_images%2Fdemo_bill.jpg?alt=media&token=2e945572-80ff-47ba-9b67-71ae5317f915';
 
   @override
   void initState() {
@@ -348,16 +350,15 @@ class _ExpenseEditScreenState extends State<ExpenseEditScreen> {
                                         fit: BoxFit.cover,
                                         errorBuilder:
                                             (context, error, stackTrace) {
-                                          return Image(
-                                            image: AssetImage(
-                                                'assets/images/demo_bill.jpg'),
+                                          return //add network image
+                                              Image.network(
+                                            _defaultImageUrl,
                                             fit: BoxFit.cover,
                                           );
                                         },
                                       )
-                                    : Image(
-                                        image: AssetImage(
-                                            'assets/images/demo_bill.jpg'),
+                                    : Image.network(
+                                        _defaultImageUrl,
                                         fit: BoxFit.cover,
                                       ),
                           ),
