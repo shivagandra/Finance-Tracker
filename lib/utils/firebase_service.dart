@@ -240,6 +240,60 @@ class FirebaseService {
   //   await ref.putFile(imageFile);
   //   return await ref.getDownloadURL();
   // }
+  Future<List<ExpenseModel>> getExpensesByFilters({
+    required DateTime month,
+    String? category,
+    double? minAmount,
+    double? maxAmount,
+    DateTime? startDate,
+    DateTime? endDate,
+    String sortBy = 'date',
+    bool sortAscending = false,
+  }) async {
+    Query query = _firestore.collection('expenses');
+
+    // Base date range for the selected month
+    DateTime monthStart = DateTime(month.year, month.month, 1);
+    DateTime monthEnd = DateTime(month.year, month.month + 1, 0);
+
+    // Apply date filters
+    DateTime effectiveStartDate = startDate ?? monthStart;
+    DateTime effectiveEndDate = endDate ?? monthEnd;
+
+    query = query.where('date', isGreaterThanOrEqualTo: effectiveStartDate);
+    query = query.where('date', isLessThanOrEqualTo: effectiveEndDate);
+
+    // Apply category filter
+    if (category != null) {
+      query = query.where('category', isEqualTo: category);
+    }
+
+    // Apply amount filters
+    if (minAmount != null) {
+      query = query.where('amount', isGreaterThanOrEqualTo: minAmount);
+    }
+    if (maxAmount != null) {
+      query = query.where('amount', isLessThanOrEqualTo: maxAmount);
+    }
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'date':
+        query = query.orderBy('date', descending: !sortAscending);
+        break;
+      case 'amount':
+        query = query.orderBy('amount', descending: !sortAscending);
+        break;
+      case 'category':
+        query = query.orderBy('category', descending: !sortAscending);
+        break;
+    }
+
+    final querySnapshot = await query.limit(10).get();
+    return querySnapshot.docs
+        .map((doc) => ExpenseModel.fromFirestore(doc))
+        .toList();
+  }
 
   Stream<List<ExpenseModel>> getExpenses() {
     String? userId = _auth.currentUser?.uid;

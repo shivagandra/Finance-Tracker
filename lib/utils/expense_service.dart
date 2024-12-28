@@ -303,4 +303,157 @@ class ExpenseService {
       throw _handleFirebaseError(e);
     }
   }
+
+  Future<List<ExpenseModel>> getExpensesByMonthAndCategory({
+    required DateTime month,
+    String? category,
+  }) async {
+    String? userId = _auth.currentUser?.uid;
+    if (userId == null) throw Exception('User not authenticated');
+
+    try {
+      // Create date range for the selected month
+      final startDate = DateTime(month.year, month.month, 1);
+      final endDate = DateTime(month.year, month.month + 1, 0, 23, 59, 59);
+
+      // Start building the query
+      Query query = _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('expenses')
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+          .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endDate));
+
+      // Add category filter if provided
+      if (category != null) {
+        query = query.where('category', isEqualTo: category);
+      }
+
+      // Add ordering
+      query = query.orderBy('date', descending: true);
+
+      final querySnapshot = await query.get();
+
+      return querySnapshot.docs
+          .map((doc) => ExpenseModel.fromFirestore(doc))
+          .toList();
+    } on FirebaseException catch (e) {
+      throw _handleFirebaseError(e);
+    }
+  }
+
+  Future<Map<String, double>> getMonthlyTotals(DateTime month) async {
+    String? userId = _auth.currentUser?.uid;
+    if (userId == null) throw Exception('User not authenticated');
+
+    try {
+      final startDate = DateTime(month.year, month.month, 1);
+      final endDate = DateTime(month.year, month.month + 1, 0, 23, 59, 59);
+
+      final querySnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('expenses')
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+          .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+          .get();
+
+      // Calculate totals by currency
+      Map<String, double> totals = {};
+      for (var doc in querySnapshot.docs) {
+        final expense = ExpenseModel.fromFirestore(doc);
+        totals[expense.currency] =
+            (totals[expense.currency] ?? 0) + expense.amount;
+      }
+
+      return totals;
+    } on FirebaseException catch (e) {
+      throw _handleFirebaseError(e);
+    }
+  }
+
+  Future<Map<String, double>> getMonthlyCategoryTotals(DateTime month) async {
+    String? userId = _auth.currentUser?.uid;
+    if (userId == null) throw Exception('User not authenticated');
+
+    try {
+      final startDate = DateTime(month.year, month.month, 1);
+      final endDate = DateTime(month.year, month.month + 1, 0, 23, 59, 59);
+
+      final querySnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('expenses')
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+          .where('date', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+          .get();
+
+      // Calculate totals by category
+      Map<String, double> categoryTotals = {};
+      for (var doc in querySnapshot.docs) {
+        final expense = ExpenseModel.fromFirestore(doc);
+        categoryTotals[expense.category] =
+            (categoryTotals[expense.category] ?? 0) + expense.amount;
+      }
+
+      return categoryTotals;
+    } on FirebaseException catch (e) {
+      throw _handleFirebaseError(e);
+    }
+  }
+
+  Future<List<ExpenseModel>> getExpensesByFilters({
+    required DateTime month,
+    String? category,
+    double? minAmount,
+    double? maxAmount,
+    DateTime? startDate,
+    DateTime? endDate,
+    String sortBy = 'date',
+    bool sortAscending = false,
+  }) async {
+    Query query = _firestore.collection('expenses');
+
+    // Base date range for the selected month
+    DateTime monthStart = DateTime(month.year, month.month, 1);
+    DateTime monthEnd = DateTime(month.year, month.month + 1, 0);
+
+    // Apply date filters
+    DateTime effectiveStartDate = startDate ?? monthStart;
+    DateTime effectiveEndDate = endDate ?? monthEnd;
+
+    query = query.where('date', isGreaterThanOrEqualTo: effectiveStartDate);
+    query = query.where('date', isLessThanOrEqualTo: effectiveEndDate);
+
+    // Apply category filter
+    if (category != null) {
+      query = query.where('category', isEqualTo: category);
+    }
+
+    // Apply amount filters
+    if (minAmount != null) {
+      query = query.where('amount', isGreaterThanOrEqualTo: minAmount);
+    }
+    if (maxAmount != null) {
+      query = query.where('amount', isLessThanOrEqualTo: maxAmount);
+    }
+
+    // Apply sorting
+    switch (sortBy) {
+      case 'date':
+        query = query.orderBy('date', descending: !sortAscending);
+        break;
+      case 'amount':
+        query = query.orderBy('amount', descending: !sortAscending);
+        break;
+      case 'category':
+        query = query.orderBy('category', descending: !sortAscending);
+        break;
+    }
+
+    final querySnapshot = await query.limit(10).get();
+    return querySnapshot.docs
+        .map((doc) => ExpenseModel.fromFirestore(doc))
+        .toList();
+  }
 }
