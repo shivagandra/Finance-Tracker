@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:finance_tracker/models/budget_model.dart';
 import 'package:finance_tracker/utils/expense_service.dart';
-import 'package:finance_tracker/screens/profile_screen.dart';
+// import 'package:finance_tracker/screens/profile_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
@@ -113,16 +113,15 @@ class FirebaseService {
     }
   }
 
-  Future<void> updateUserProfile(Map<String, dynamic> data) async {
-    String? userId = _auth.currentUser?.uid;
-    if (userId == null) throw Exception('User not authenticated');
+  // Future<void> updateUserProfile(Map<String, dynamic> data) async {
+  //   String? userId = _auth.currentUser?.uid;
+  //   if (userId == null) throw Exception('User not authenticated');
 
-    await _firestore.collection('users').doc(userId).update(data);
-  }
+  //   await _firestore.collection('users').doc(userId).update(data);
+  // }
 
-  Future<String?> updateProfileImage() async {
+  Future<Object> updateProfileImage() async {
     try {
-      // Get current user
       final user = _auth.currentUser;
       if (user == null) throw Exception('No user logged in');
 
@@ -135,7 +134,22 @@ class FirebaseService {
         imageQuality: 85,
       );
 
-      if (image == null) return null;
+      if (image == null)
+        return Image(image: AssetImage('assets/images/person.png'));
+
+      // Delete old profile image if it exists
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final userData = userDoc.data();
+      if (userData != null && userData['profileImage'] != null) {
+        final oldImageUrl = userData['profileImage'] as String;
+        if (oldImageUrl.startsWith('http')) {
+          try {
+            await _storage.refFromURL(oldImageUrl).delete();
+          } catch (e) {
+            throw Exception('Failed to delete old profile image: $e');
+          }
+        }
+      }
 
       // Generate a unique filename using user ID and timestamp
       final String fileName =
@@ -143,35 +157,13 @@ class FirebaseService {
       final Reference storageRef =
           _storage.ref().child('profile_images/$fileName');
 
-      // Delete old profile image if it exists
-      try {
-        final userDoc =
-            await _firestore.collection('users').doc(user.uid).get();
-        final userData = userDoc.data();
-        if (userData != null && userData['profileImage'] != null) {
-          final oldImageUrl = userData['profileImage'] as String;
-          if (oldImageUrl.isNotEmpty) {
-            await _storage.refFromURL(oldImageUrl).delete();
-          }
-        }
-      } catch (e) {
-        // Log error but continue with upload
-        if (kDebugMode) {
-          print('Error deleting old profile image: $e');
-        }
-      }
-
       // Upload new image
       UploadTask uploadTask;
       if (kIsWeb) {
-        // Handle web platform
         final bytes = await image.readAsBytes();
         uploadTask = storageRef.putData(
-          bytes,
-          SettableMetadata(contentType: 'image/jpeg'),
-        );
+            bytes, SettableMetadata(contentType: 'image/jpeg'));
       } else {
-        // Handle mobile platforms
         final imageFile = File(image.path);
         uploadTask = storageRef.putFile(imageFile);
       }
@@ -194,6 +186,100 @@ class FirebaseService {
       rethrow;
     }
   }
+
+  Future<void> updateUserProfile(Map<String, dynamic> data) async {
+    String? userId = _auth.currentUser?.uid;
+    if (userId == null) throw Exception('User not authenticated');
+
+    // If we're updating the profile image and it's being set to null or empty
+    if (data.containsKey('profileImage') &&
+        (data['profileImage'] == null ||
+            data['profileImage'].toString().isEmpty)) {
+      // Set it to the default asset path
+      data['profileImage'] = 'assets/images/person.png';
+    }
+
+    await _firestore.collection('users').doc(userId).update(data);
+  }
+
+  // Future<void> updateProfileWithBudget({
+  //   String? imageUrl,
+  //   required double monthlyBudget,
+  //   required String currency,
+  //   required String name,
+  // }) async {
+  //   try {
+  //     final user = _auth.currentUser;
+  //     if (user == null) throw Exception('No user logged in');
+
+  //     WriteBatch batch = _firestore.batch();
+  //     DocumentReference userRef = _firestore.collection('users').doc(user.uid);
+
+  //     // If a new image is being set
+  //     if (imageUrl != null) {
+  //       // Delete old image if it exists
+  //       final userDoc = await userRef.get();
+  //       final userData = userDoc.data() as Map<String, dynamic>?;
+  //       if (userData != null && userData['profileImage'] != null) {
+  //         final oldImageUrl = userData['profileImage'] as String;
+  //         if (oldImageUrl.startsWith('http')) {
+  //           try {
+  //             await _storage.refFromURL(oldImageUrl).delete();
+  //           } catch (e) {
+  //             throw Exception('Failed to delete old profile image: $e');
+  //           }
+  //         }
+  //       }
+  //     }
+
+  //     // Update profile
+  //     Map<String, dynamic> profileUpdate = {
+  //       'name': name,
+  //       'lastUpdated': FieldValue.serverTimestamp(),
+  //       // Use the provided imageUrl or default to asset path
+  //       'profileImage': imageUrl ?? 'assets/images/person.png',
+  //     };
+
+  //     batch.update(userRef, profileUpdate);
+
+  //     // Update or create budget
+  //     QuerySnapshot budgetQuery = await _firestore
+  //         .collection('users')
+  //         .doc(user.uid)
+  //         .collection('budgets')
+  //         .limit(1)
+  //         .get();
+
+  //     if (budgetQuery.docs.isNotEmpty) {
+  //       DocumentReference budgetRef = budgetQuery.docs.first.reference;
+  //       batch.update(budgetRef, {
+  //         'amount': monthlyBudget,
+  //         'currency': currency,
+  //         'updatedAt': FieldValue.serverTimestamp(),
+  //       });
+  //     } else {
+  //       DocumentReference newBudgetRef = _firestore
+  //           .collection('users')
+  //           .doc(user.uid)
+  //           .collection('budgets')
+  //           .doc();
+  //       batch.set(newBudgetRef, {
+  //         'amount': monthlyBudget,
+  //         'currency': currency,
+  //         'period': 'monthly',
+  //         'startDate': DateTime.now(),
+  //         'createdAt': FieldValue.serverTimestamp(),
+  //       });
+  //     }
+
+  //     await batch.commit();
+  //   } catch (e) {
+  //     if (kDebugMode) {
+  //       print('Error updating profile and budget: $e');
+  //     }
+  //     rethrow;
+  //   }
+  // }
 
   Future<void> addExpense(ExpenseModel expense) async {
     String? userId = _auth.currentUser?.uid;
@@ -673,6 +759,112 @@ class FirebaseService {
     }
   }
 
+  // Future<void> updateExpense(ExpenseModel expense) async {
+  //   String? userId = _auth.currentUser?.uid;
+  //   if (userId == null) throw Exception('User not authenticated');
+
+  //   try {
+  //     final docRef = _firestore
+  //         .collection('users')
+  //         .doc(userId)
+  //         .collection('expenses')
+  //         .doc(expense.id);
+
+  //     final docSnapshot = await docRef.get();
+  //     if (!docSnapshot.exists) {
+  //       throw Exception('Expense document not found');
+  //     }
+
+  //     String? imageUrl;
+  //     // Handle image update
+  //     if (expense.imagePath != null) {
+  //       if (!expense.imagePath!.startsWith('http')) {
+  //         // New image file to upload
+  //         try {
+  //           imageUrl = await uploadExpenseImage(expense.imagePath!);
+  //           if (imageUrl == null) {
+  //             throw Exception('Failed to upload image');
+  //           }
+
+  //           // Delete old image only if it's not the placeholder
+  //           final oldData = docSnapshot.data() as Map<String, dynamic>;
+  //           if (oldData['imageUrl'] != null &&
+  //               oldData['imageUrl'].toString().startsWith('http') &&
+  //               !oldData['imageUrl'].toString().contains('placeholder.com')) {
+  //             try {
+  //               final oldImageRef =
+  //                   FirebaseStorage.instance.refFromURL(oldData['imageUrl']);
+  //               await oldImageRef.delete();
+  //             } catch (e) {
+  //               if (kDebugMode) {
+  //                 print('Warning: Failed to delete old image: $e');
+  //               }
+  //             }
+  //           }
+  //         } catch (uploadError) {
+  //           throw Exception('Error uploading new image: $uploadError');
+  //         }
+  //       } else {
+  //         // If it's an existing image URL and not the placeholder, keep it
+  //         imageUrl = expense.imagePath!.contains('placeholder.com')
+  //             ? 'https://via.placeholder.com/150'
+  //             : expense.imagePath;
+  //       }
+  //     } else {
+  //       // If imagePath is null, use placeholder
+  //       imageUrl = 'https://via.placeholder.com/150';
+  //     }
+
+  //     // Create update data map
+  //     Map<String, dynamic> updateData = {
+  //       'amount': expense.amount,
+  //       'category': expense.category,
+  //       'description': expense.description,
+  //       'date': expense.date.toIso8601String(),
+  //       'currency': expense.currency,
+  //       'updatedAt': FieldValue.serverTimestamp(),
+  //       'imageUrl': imageUrl, // Always include imageUrl in update
+  //     };
+
+  //     // Update the document with transaction to ensure atomicity
+  //     await _firestore.runTransaction((transaction) async {
+  //       final freshSnapshot = await transaction.get(docRef);
+  //       if (!freshSnapshot.exists) {
+  //         throw Exception('Expense document was deleted during update');
+  //       }
+  //       transaction.update(docRef, updateData);
+  //     });
+  //   } catch (e) {
+  //     if (e is FirebaseException) {
+  //       switch (e.code) {
+  //         case 'permission-denied':
+  //           throw Exception(
+  //               'You do not have permission to update this expense');
+  //         case 'not-found':
+  //           throw Exception('The expense no longer exists');
+  //         case 'unavailable':
+  //           throw Exception(
+  //               'Service temporarily unavailable. Please try again');
+  //         case 'cancelled':
+  //           throw Exception('Operation cancelled. Please try again');
+  //         default:
+  //           throw Exception('Firebase error: ${e.message}');
+  //       }
+  //     }
+  //     if (e.toString() ==
+  //         'Exception: Expense document was deleted during update') {
+  //       ScaffoldMessenger.of(path.context as BuildContext).showSnackBar(
+  //         const SnackBar(
+  //           content: Text(
+  //               'The expense was deleted or no longer exists. Please refresh the list.'),
+  //         ),
+  //       );
+  //       MaterialPageRoute(builder: (context) => ProfilePage());
+  //     } else {
+  //       rethrow;
+  //     }
+  //   }
+  // }
   Future<void> updateExpense(ExpenseModel expense) async {
     String? userId = _auth.currentUser?.uid;
     if (userId == null) throw Exception('User not authenticated');
@@ -693,40 +885,33 @@ class FirebaseService {
       // Handle image update
       if (expense.imagePath != null) {
         if (!expense.imagePath!.startsWith('http')) {
-          // New image file to upload
-          try {
-            imageUrl = await uploadExpenseImage(expense.imagePath!);
-            if (imageUrl == null) {
-              throw Exception('Failed to upload image');
+          // Delete old image if it exists
+          final oldData = docSnapshot.data() as Map<String, dynamic>;
+          if (oldData['imageUrl'] != null &&
+              oldData['imageUrl'].toString().startsWith('http')) {
+            try {
+              final oldImageRef =
+                  FirebaseStorage.instance.refFromURL(oldData['imageUrl']);
+              await oldImageRef.delete();
+            } catch (e) {
+              throw Exception('Failed to delete old image: $e');
             }
+          }
 
-            // Delete old image only if it's not the placeholder
-            final oldData = docSnapshot.data() as Map<String, dynamic>;
-            if (oldData['imageUrl'] != null &&
-                oldData['imageUrl'].toString().startsWith('http') &&
-                !oldData['imageUrl'].toString().contains('placeholder.com')) {
-              try {
-                final oldImageRef =
-                    FirebaseStorage.instance.refFromURL(oldData['imageUrl']);
-                await oldImageRef.delete();
-              } catch (e) {
-                if (kDebugMode) {
-                  print('Warning: Failed to delete old image: $e');
-                }
-              }
-            }
-          } catch (uploadError) {
-            throw Exception('Error uploading new image: $uploadError');
+          // Upload new image
+          imageUrl = await uploadExpenseImage(expense.imagePath!);
+          if (imageUrl == null) {
+            throw Exception('Failed to upload new image');
           }
         } else {
-          // If it's an existing image URL and not the placeholder, keep it
-          imageUrl = expense.imagePath!.contains('placeholder.com')
-              ? 'https://via.placeholder.com/150'
-              : expense.imagePath;
+          // Keep existing Firebase URL, otherwise use asset path
+          imageUrl = expense.imagePath!.startsWith('http')
+              ? expense.imagePath
+              : 'assets/images/demo_bill.jpg';
         }
       } else {
-        // If imagePath is null, use placeholder
-        imageUrl = 'https://via.placeholder.com/150';
+        // If imagePath is null, use local asset path
+        imageUrl = 'assets/images/demo_bill.jpg';
       }
 
       // Create update data map
@@ -737,7 +922,7 @@ class FirebaseService {
         'date': expense.date.toIso8601String(),
         'currency': expense.currency,
         'updatedAt': FieldValue.serverTimestamp(),
-        'imageUrl': imageUrl, // Always include imageUrl in update
+        'imageUrl': imageUrl,
       };
 
       // Update the document with transaction to ensure atomicity
@@ -765,18 +950,7 @@ class FirebaseService {
             throw Exception('Firebase error: ${e.message}');
         }
       }
-      if (e.toString() ==
-          'Exception: Expense document was deleted during update') {
-        ScaffoldMessenger.of(path.context as BuildContext).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'The expense was deleted or no longer exists. Please refresh the list.'),
-          ),
-        );
-        MaterialPageRoute(builder: (context) => ProfilePage());
-      } else {
-        rethrow;
-      }
+      rethrow;
     }
   }
 

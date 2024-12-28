@@ -1,7 +1,9 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 // import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 // import 'package:intl/intl.dart';
@@ -327,12 +329,21 @@ class _ProfilePageState extends State<ProfilePage> {
       });
 
       final String userId = FirebaseAuth.instance.currentUser!.uid;
-      final File file = File(pickedFile.path);
       final String fileName =
           'profile_images/$userId/${DateTime.now().millisecondsSinceEpoch}.jpg';
       final Reference storageRef =
           FirebaseStorage.instance.ref().child(fileName);
-      final UploadTask uploadTask = storageRef.putFile(file);
+
+      UploadTask uploadTask;
+      if (kIsWeb) {
+        // Web: Use pickedFile.bytes
+        final Uint8List imageData = await pickedFile.readAsBytes();
+        uploadTask = storageRef.putData(imageData);
+      } else {
+        // Mobile: Use File
+        final File file = File(pickedFile.path);
+        uploadTask = storageRef.putFile(file);
+      }
 
       final TaskSnapshot snapshot = await uploadTask;
       final String downloadUrl = await snapshot.ref.getDownloadURL();
