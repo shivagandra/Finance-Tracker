@@ -317,9 +317,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   bool _isLoading = false;
   String? _imageUrl;
   DateTime _selectedDate = DateTime.now();
+  final String _defaultImageAsset = 'assets/images/demo_bill.jpg';
   final String _defaultImageUrl =
-      'https://firebasestorage.googleapis.com/v0/b/personal-finance-tracker-e8905.firebasestorage.app/o/default_images%2Fdemo_bill.jpg?alt=media&token=2e945572-80ff-47ba-9b67-71ae5317f915';
-
+      'https://firebasestorage.googleapis.com/v0/b/personal-finance-tracker-e8905.firebasestorage.app/o/default_images%2Fdemo_bill.jpg?alt=media&token=0db06daa-52e9-4df0-8c1a-cc6d38704a9c';
   Future<void> _saveExpense() async {
     if (_descriptionController.text.isEmpty ||
         _amountController.text.isEmpty ||
@@ -468,10 +468,16 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                       _imageUrl!,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
-                        return Image.network(_defaultImageUrl);
+                        return Image.asset(
+                          _defaultImageAsset,
+                          fit: BoxFit.cover,
+                        );
                       },
                     )
-                  : Image.network(_defaultImageUrl),
+                  : Image.asset(
+                      _defaultImageAsset,
+                      fit: BoxFit.cover,
+                    ),
         ),
         const SizedBox(height: 16),
         ElevatedButton.icon(

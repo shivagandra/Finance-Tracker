@@ -670,10 +670,17 @@ class FirebaseService {
           SettableMetadata(contentType: 'image/jpeg'),
         );
       }
-
+      // Monitor upload progress (optional)
+      uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+        final progress = snapshot.bytesTransferred / snapshot.totalBytes;
+        debugPrint('Upload progress: ${(progress * 100).toStringAsFixed(2)}%');
+      }, onError: (e) {
+        debugPrint('Upload error: $e');
+      });
       // Wait for the upload to complete and get URL
       final TaskSnapshot taskSnapshot = await uploadTask;
       final String downloadUrl = await taskSnapshot.ref.getDownloadURL();
+      debugPrint('Image uploaded successfully. URL: $downloadUrl');
 
       return downloadUrl;
     } catch (e) {

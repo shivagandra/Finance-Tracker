@@ -37,15 +37,16 @@ class _ExpenseViewScreenState extends State<ExpenseViewScreen> {
       final newExpenses = await _expenseService.getExpensesByCategory(
         category: _selectedCategory,
       );
-
-      setState(() {
-        _expenses.addAll(newExpenses);
-        //add filter to display only expenses from current month
-        _expenses.removeWhere(
-            (element) => element.date.month != DateTime.now().month);
-        _hasMore = newExpenses.length == _pageSize;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _expenses.addAll(newExpenses);
+          //add filter to display only expenses from current month
+          _expenses.removeWhere(
+              (element) => element.date.month != DateTime.now().month);
+          _hasMore = newExpenses.length == _pageSize;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       setState(() => _isLoading = false);
       _showError('Failed to load expenses: $e');
@@ -395,14 +396,14 @@ class ExpenseDetailScreen extends StatelessWidget {
                     );
                   },
                   child: Center(
-                    child: FadeInImage.memoryNetwork(
-                      placeholder: kTransparentImage,
+                    child: FadeInImage.assetNetwork(
+                      placeholder: 'assets/images/demo_bill.jpg',
                       image: expense.imagePath!,
                       fit: BoxFit.cover,
                       imageErrorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                          child:
-                              Icon(Icons.error, size: 40, color: Colors.grey),
+                        return Image.asset(
+                          'assets/images/demo_bill.jpg',
+                          fit: BoxFit.cover,
                         );
                       },
                     ),
