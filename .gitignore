@@ -33,4 +33,4 @@ node_modules/
 *.log
 package-lock.json
 .firebase/
-
+*.cache

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:finance_tracker/utils/expense_service.dart';
 import 'package:finance_tracker/screens/expense_card.dart';
 import 'package:finance_tracker/utils/firebase_service.dart';
-import 'package:finance_tracker/utils/general_utilities.dart';
 import 'package:flutter/material.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -81,14 +80,14 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Search Expenses',
-          style: TextStyle(
-            fontSize: 20,
-            color: hexToColor('#FF6F61'),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        // title: Text(
+        //   'Search Expenses',
+        //   style: TextStyle(
+        //     fontSize: 20,
+        //     color: hexToColor('#FF6F61'),
+        //     fontWeight: FontWeight.bold,
+        //   ),
+        // ),
         elevation: 0,
         actions: [
           if (_hasActiveFilters)
@@ -110,6 +109,7 @@ class _SearchScreenState extends State<SearchScreen> {
               color: Theme.of(context).cardColor,
               boxShadow: [
                 BoxShadow(
+                  // ignore: deprecated_member_use
                   color: Colors.grey.withOpacity(0.1),
                   spreadRadius: 1,
                   blurRadius: 5,
