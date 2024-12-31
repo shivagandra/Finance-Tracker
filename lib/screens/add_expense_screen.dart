@@ -524,17 +524,43 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 16),
+            // StreamBuilder<List<String>>(
+            //   stream: _firebaseService.getCategories(),
+            //   builder: (context, snapshot) {
+            //     if (snapshot.connectionState == ConnectionState.waiting) {
+            //       return const CircularProgressIndicator();
+            //     } else if (snapshot.hasError) {
+            //       return Text('Error: ${snapshot.error}');
+            //     } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            //       return const Text('No categories available');
+            //     }
+
+            //     return DropdownButtonFormField<String>(
+            //       value: _selectedCategory,
+            //       decoration: const InputDecoration(
+            //         labelText: 'Category',
+            //         border: OutlineInputBorder(),
+            //       ),
+            //       items: snapshot.data!.map((category) {
+            //         return DropdownMenuItem(
+            //           value: category,
+            //           child: Text(category),
+            //         );
+            //       }).toList(),
+            //       onChanged: (value) {
+            //         setState(() {
+            //           _selectedCategory = value;
+            //         });
+            //       },
+            //     );
+            //   },
+            // ),
             StreamBuilder<List<String>>(
               stream: _firebaseService.getCategories(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+                if (!snapshot.hasData) {
                   return const CircularProgressIndicator();
-                } else if (snapshot.hasError) {
-                  return Text('Error: ${snapshot.error}');
-                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Text('No categories available');
                 }
-
                 return DropdownButtonFormField<String>(
                   value: _selectedCategory,
                   decoration: const InputDecoration(
@@ -548,9 +574,13 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                     );
                   }).toList(),
                   onChanged: (value) {
-                    setState(() {
-                      _selectedCategory = value;
-                    });
+                    setState(() => _selectedCategory = value);
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please select a category';
+                    }
+                    return null;
                   },
                 );
               },
