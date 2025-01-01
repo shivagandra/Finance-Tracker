@@ -102,19 +102,51 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() => _isLoading = true);
 
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(FirebaseAuth.instance.currentUser!.uid)
-          .update({
+      final userId = FirebaseAuth.instance.currentUser!.uid;
+      final newBudget = double.parse(_budgetController.text);
+      final batch = FirebaseFirestore.instance.batch();
+
+      // Update user profile
+      final userRef =
+          FirebaseFirestore.instance.collection('users').doc(userId);
+      batch.update(userRef, {
         'name': _nameController.text.trim(),
         'defaultCurrency': _selectedCurrency,
-        'monthlyBudget': double.parse(_budgetController.text),
       });
 
-      setState(() {
-        _isEditing = false;
-      });
+      // Get existing budget document
+      final budgetQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('budgets')
+          .limit(1)
+          .get();
 
+      if (budgetQuery.docs.isNotEmpty) {
+        // Update existing budget
+        batch.update(budgetQuery.docs.first.reference, {
+          'amount': newBudget,
+          'currency': _selectedCurrency,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Create new budget
+        final budgetRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('budgets')
+            .doc();
+        batch.set(budgetRef, {
+          'amount': newBudget,
+          'currency': _selectedCurrency,
+          'period': 'monthly',
+          'startDate': DateTime.now(),
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+      setState(() => _isEditing = false);
       await _loadProfileData();
 
       if (mounted) {
