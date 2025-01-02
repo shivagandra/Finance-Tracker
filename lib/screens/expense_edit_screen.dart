@@ -23,6 +23,7 @@ class _ExpenseEditScreenState extends State<ExpenseEditScreen> {
 
   String? _selectedCategory;
   String? _selectedCurrency;
+  String? _selectedPaymentMode;
   String? _imageUrl;
   XFile? _selectedImage;
   DateTime _selectedDate = DateTime.now();
@@ -44,6 +45,7 @@ class _ExpenseEditScreenState extends State<ExpenseEditScreen> {
     _amountController.text = widget.expense.amount.toString();
     _selectedCategory = widget.expense.category;
     _selectedCurrency = widget.expense.currency;
+    _selectedPaymentMode = widget.expense.modeOfPayment;
     _imageUrl = widget.expense.imagePath != _defaultImageUrl
         ? widget.expense.imagePath
         : null;
@@ -73,7 +75,6 @@ class _ExpenseEditScreenState extends State<ExpenseEditScreen> {
         debugPrint('Image picked: ${pickedImage.path}');
         setState(() => _selectedImage = pickedImage);
 
-        // Upload image and get URL
         final String? downloadUrl =
             await _firebaseService.uploadExpenseImage(pickedImage.path);
         debugPrint('Download URL received: $downloadUrl');
@@ -81,8 +82,7 @@ class _ExpenseEditScreenState extends State<ExpenseEditScreen> {
         if (downloadUrl != null && downloadUrl.isNotEmpty) {
           setState(() {
             _imageUrl = downloadUrl;
-            _selectedImage =
-                null; // Clear selected image after successful upload
+            _selectedImage = null;
           });
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -183,6 +183,7 @@ class _ExpenseEditScreenState extends State<ExpenseEditScreen> {
         currency: _selectedCurrency!,
         date: _selectedDate,
         imagePath: imagePath,
+        modeOfPayment: _selectedPaymentMode!,
       );
 
       await _firebaseService.updateExpense(updatedExpense);
@@ -325,6 +326,36 @@ class _ExpenseEditScreenState extends State<ExpenseEditScreen> {
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please select a currency';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _selectedPaymentMode,
+                      decoration: const InputDecoration(
+                        labelText: 'Payment Mode',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: [
+                        'UPI',
+                        'Cash',
+                        'Cards',
+                        'Net Banking',
+                        'Wallets',
+                        'Others'
+                      ].map((mode) {
+                        return DropdownMenuItem(
+                          value: mode,
+                          child: Text(mode),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() => _selectedPaymentMode = value);
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please select a payment mode';
                         }
                         return null;
                       },

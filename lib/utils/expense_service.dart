@@ -18,6 +18,8 @@ class ExpenseModel {
 
   static const Uuid _uuid = Uuid();
 
+  String? modeOfPayment;
+
   ExpenseModel({
     String? id,
     required this.amount,
@@ -26,6 +28,7 @@ class ExpenseModel {
     required this.date,
     this.imagePath,
     this.currency = 'USD',
+    this.modeOfPayment = 'UPI',
   }) : id = id ?? _uuid.v1();
 
   // Create a copy of the expense with modified fields
@@ -37,6 +40,7 @@ class ExpenseModel {
     DateTime? date,
     String? currency,
     String? imagePath,
+    String? modeOfPayment,
   }) {
     return ExpenseModel(
       id: id ?? this.id,
@@ -46,6 +50,7 @@ class ExpenseModel {
       date: date ?? this.date,
       currency: currency ?? this.currency,
       imagePath: imagePath ?? this.imagePath,
+      modeOfPayment: modeOfPayment ?? this.modeOfPayment,
     );
   }
 
@@ -58,6 +63,7 @@ class ExpenseModel {
       'date': date,
       'imagePath': imagePath,
       'currency': currency,
+      'modeOfPayment': modeOfPayment,
     };
   }
 
@@ -70,6 +76,7 @@ class ExpenseModel {
       date: map['date'],
       imagePath: map['imagePath'],
       currency: map['currency'] ?? 'USD',
+      modeOfPayment: map['modeOfPayment'] ?? 'UPI',
     );
   }
 
@@ -94,6 +101,7 @@ class ExpenseModel {
       amount: (data['amount'] ?? 0.0).toDouble(),
       date: dateTime,
       imagePath: data['imageUrl'],
+      modeOfPayment: data['modeOfPayment'],
     );
   }
 }

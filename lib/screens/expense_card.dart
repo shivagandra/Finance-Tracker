@@ -25,6 +25,7 @@ class ExpenseCard extends StatelessWidget {
             Text(
                 "Amount: ${expense.currency} ${expense.amount.toStringAsFixed(2)}"),
             Text("Date: ${expense.date}"),
+            Text("Payment Mode: ${expense.modeOfPayment}"),
           ],
         ),
       ),

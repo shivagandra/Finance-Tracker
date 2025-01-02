@@ -320,6 +320,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   final String _defaultImageAsset = 'assets/images/demo_bill.jpg';
   final String _defaultImageUrl =
       'https://firebasestorage.googleapis.com/v0/b/personal-finance-tracker-e8905.firebasestorage.app/o/default_images%2Fdemo_bill.jpg?alt=media&token=0db06daa-52e9-4df0-8c1a-cc6d38704a9c';
+  String _selectedPaymentMode = 'UPI';
+
   Future<void> _saveExpense() async {
     if (_descriptionController.text.isEmpty ||
         _amountController.text.isEmpty ||
@@ -524,37 +526,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 16),
-            // StreamBuilder<List<String>>(
-            //   stream: _firebaseService.getCategories(),
-            //   builder: (context, snapshot) {
-            //     if (snapshot.connectionState == ConnectionState.waiting) {
-            //       return const CircularProgressIndicator();
-            //     } else if (snapshot.hasError) {
-            //       return Text('Error: ${snapshot.error}');
-            //     } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            //       return const Text('No categories available');
-            //     }
-
-            //     return DropdownButtonFormField<String>(
-            //       value: _selectedCategory,
-            //       decoration: const InputDecoration(
-            //         labelText: 'Category',
-            //         border: OutlineInputBorder(),
-            //       ),
-            //       items: snapshot.data!.map((category) {
-            //         return DropdownMenuItem(
-            //           value: category,
-            //           child: Text(category),
-            //         );
-            //       }).toList(),
-            //       onChanged: (value) {
-            //         setState(() {
-            //           _selectedCategory = value;
-            //         });
-            //       },
-            //     );
-            //   },
-            // ),
             StreamBuilder<List<String>>(
               stream: _firebaseService.getCategories(),
               builder: (context, snapshot) {
@@ -601,6 +572,26 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               onChanged: (value) {
                 setState(() {
                   _selectedCurrency = value;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedPaymentMode,
+              decoration: const InputDecoration(
+                labelText: 'Payment Mode',
+                border: OutlineInputBorder(),
+              ),
+              items:
+                  ['UPI', 'Cash', 'Card', 'Net Banking', 'Other'].map((mode) {
+                return DropdownMenuItem(
+                  value: mode,
+                  child: Text(mode),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedPaymentMode = value!;
                 });
               },
             ),

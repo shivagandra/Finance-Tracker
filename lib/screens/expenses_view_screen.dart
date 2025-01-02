@@ -168,68 +168,6 @@ class _ExpenseViewScreenState extends State<ExpenseViewScreen> {
     );
   }
 
-  // Widget _buildExpensesList() {
-  //   if (_expenses.isEmpty) {
-  //     return _isLoading
-  //         ? const Center(child: CircularProgressIndicator())
-  //         : const Center(child: Text('No expenses found'));
-  //   }
-  //   return ListView.builder(
-  //     padding: const EdgeInsets.all(8),
-  //     itemCount: _expenses.length + (_hasMore ? 1 : 0),
-  //     itemBuilder: (context, index) {
-  //       if (index == _expenses.length) {
-  //         _loadExpenses();
-  //         return const Center(
-  //           child: Padding(
-  //             padding: EdgeInsets.all(16),
-  //             child: CircularProgressIndicator(),
-  //           ),
-  //         );
-  //       }
-  //       final expense = _expenses[index];
-  //       return Dismissible(
-  //         key: Key(expense.id),
-  //         direction: DismissDirection.endToStart,
-  //         background: Container(
-  //           color: Colors.red,
-  //           alignment: Alignment.centerRight,
-  //           padding: const EdgeInsets.only(right: 16),
-  //           child: const Icon(Icons.delete, color: Colors.white),
-  //         ),
-  //         onDismissed: (_) => _deleteExpense(expense),
-  //         child: Card(
-  //           elevation: 2,
-  //           margin: const EdgeInsets.symmetric(vertical: 4),
-  //           child: ListTile(
-  //             onTap: () => _viewExpenseDetails(expense),
-  //             leading: CircleAvatar(
-  //               backgroundColor: Theme.of(context).primaryColor,
-  //               child: Text(
-  //                 expense.category[0].toUpperCase(),
-  //                 style: const TextStyle(color: Colors.white),
-  //               ),
-  //             ),
-  //             title: Text(
-  //               expense.description,
-  //               style: const TextStyle(fontWeight: FontWeight.bold),
-  //             ),
-  //             subtitle: Text(
-  //               DateFormat('MMM dd, yyyy').format(expense.date),
-  //             ),
-  //             trailing: Text(
-  //               '${expense.currency} ${expense.amount.toStringAsFixed(2)}',
-  //               style: const TextStyle(
-  //                 fontWeight: FontWeight.bold,
-  //                 fontSize: 16,
-  //               ),
-  //             ),
-  //           ),
-  //         ),
-  //       );
-  //     },
-  //   );
-  // }
   Widget _buildExpensesList() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -474,6 +412,13 @@ class ExpenseDetailScreen extends StatelessWidget {
           icon: Icons.category,
           label: 'Category',
           value: expense.category,
+        ),
+        const SizedBox(height: 16),
+        _buildDetailItem(
+          context,
+          icon: Icons.payment,
+          label: 'Payment Mode',
+          value: expense.modeOfPayment ?? 'UPI',
         ),
       ],
     );

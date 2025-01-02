@@ -855,6 +855,7 @@ class FirebaseService {
         'currency': expense.currency,
         'updatedAt': FieldValue.serverTimestamp(),
         'imageUrl': imageUrl,
+        'modeOfPayment': expense.modeOfPayment,
       };
 
       // Update the document with transaction to ensure atomicity

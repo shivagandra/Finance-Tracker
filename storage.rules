@@ -1,12 +1,19 @@
 rules_version = '2';
-
-// Craft rules based on data in your Firestore database
-// allow write: if firestore.get(
-//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
 service firebase.storage {
   match /b/{bucket}/o {
+    // Allow read access to all folders
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read: if true;
+    }
+    
+    // Restrict write access to default_images folder
+    match /default_images/{image=**} {
+      allow write: if false;
+    }
+    
+    // Allow write access to other folders
+    match /{folder}/{allPaths=**} {
+      allow write: if folder != "default_images";
     }
   }
 }
