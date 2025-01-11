@@ -210,9 +210,22 @@ class FirebaseService {
     String? userId = _auth.currentUser?.uid;
     if (userId == null) throw Exception('User not authenticated');
 
-    String? imageUrl = expense.imagePath;
-    if (expense.imagePath != null && !expense.imagePath!.startsWith('http')) {
-      imageUrl = await uploadExpenseImage(expense.imagePath!);
+    String? imageUrl = _defaultImageUrl;
+    if (expense.imagePath != null &&
+        !expense.imagePath!.startsWith('http') &&
+        expense.imagePath != _defaultImageUrl) {
+      try {
+        final uploadedUrl = await uploadExpenseImage(expense.imagePath!);
+        if (uploadedUrl != null) {
+          imageUrl = uploadedUrl;
+        }
+      } catch (e) {
+        debugPrint('Error uploading image: $e');
+        // Continue with default image if upload fails
+      }
+    } else if (expense.imagePath != null &&
+        expense.imagePath!.startsWith('http')) {
+      imageUrl = expense.imagePath!;
     }
 
     await _firestore
@@ -224,7 +237,9 @@ class FirebaseService {
       'category': expense.category,
       'description': expense.description,
       'date': expense.date.toIso8601String(),
-      'imageUrl': imageUrl ?? 'https://via.placeholder.com/150',
+      'imageUrl': imageUrl ??
+          'https://firebasestorage.googleapis.com/v0/b/personal-finance-tracker-e8905.firebasestorage.app/o/default_images%2Fdemo_bill.jpg?alt=media&token=2e945572-80ff-47ba-9b67-71ae5317f915',
+      'modeOfPayment': expense.modeOfPayment,
       'currency': expense.currency,
     });
   }

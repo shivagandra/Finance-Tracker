@@ -101,7 +101,7 @@ class ExpenseModel {
       amount: (data['amount'] ?? 0.0).toDouble(),
       date: dateTime,
       imagePath: data['imageUrl'],
-      modeOfPayment: data['modeOfPayment'],
+      modeOfPayment: data['modeOfPayment'] ?? 'UPI',
     );
   }
 }
